@@ -1,51 +1,37 @@
 # projeto_eng_software
 
-# integrantes do grupo
+# Integrantes do grupo
 1. Carlos Eduardo Santos Oliveira - 
 2. Gabrielli Valelia Sousa da Silva - Front-end
 3. Natalia Dias Santos Mota - 
 4. Pedro Alonso Araujo Silva - 
 
-# objetivo
-- 
-- 
-- 
-- 
-- 
+# Objetivo do Sistema
+- Desenvolver uma aplicação web responsiva voltada para a Gestão de Treinos de Musculação, centralizando a interação entre professores e alunos.
+- No sistema, o professor será responsável por montar e alterar as fichas de exercícios e acompanhar o progresso e a frequência de seus diversos alunos. 
+- Já o aluno poderá visualizar suas fichas de treino prescritas, montar fichas de sua preferência (com validação do professor), registrar as cargas e repetições executadas no dia, além de monitorar sua própria evolução contínua de forma estruturada.
 
-# tecnologias
+# Tecnologias
 
 
-# histórias de usuários
+# Histórias de Usuários
 
-1. 
-- 
-- 
+  **Visão Aluno**
+  
+1. Como aluno, eu quero visualizar minha ficha de treino do dia para saber exatamente quais exercícios executar.
 
-2. 
-- 
-- 
+2. Como aluno, eu quero visualizar um painel com meu progresso (evolução de pesos e dias frequentados) para monitorar meus resultados de forma estruturada.
 
-3. 
-- 
-- 
+3.
 
 4. 
-- 
-- 
 
-5. 
-- 
-- 
+  **Visão Professor**
+  
+1. 
 
-6. 
-- 
-- 
+2.
 
-7. 
-- 
-- 
+3.
 
-8. 
-- 
-- 
+4. 
