@@ -23,7 +23,7 @@ Pedro Alonso Araujo Silva (Front-end e Infra):
 Front-end: React.js (TypeScript)
 Back-end: Python (FastAPI)
 Banco de Dados: PostgreSQL
-Agentes de IA: GitHub Copilot e Gemini
+Agentes de IA: Cursor, Claude e Gemini
 
 # Histórias de Usuários
 
