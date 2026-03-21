@@ -1,10 +1,17 @@
 # projeto_eng_software
 
 # Integrantes do grupo
-1. Carlos Eduardo Santos Oliveira - 
-2. Gabrielli Valelia Sousa da Silva - Front-end
-3. Natalia Dias Santos Mota - 
-4. Pedro Alonso Araujo Silva - 
+Carlos Eduardo Santos Oliveira (Back-end): 
+  Desenvolvimento da API (FastAPI), rotas, conexão com o banco de dados e autenticação.
+
+Gabrielli Valelia Sousa da Silva (Front-end): 
+  Construção da interface web responsiva (React), consumo da API e navegação do sistema.
+
+Natalia Dias Santos Mota (Back-end): 
+  Modelagem do banco de dados (PostgreSQL), regras de negócio (cálculos de treino) e documentação geral.
+
+Pedro Alonso Araujo Silva (Full-stack / Infra): 
+  Configuração do GitHub, auxílio na integração front/back, testes básicos e deploy da aplicação.
 
 # Objetivo do Sistema
 - Desenvolver uma aplicação web responsiva voltada para a Gestão de Treinos de Musculação, centralizando a interação entre professores e alunos.
@@ -12,10 +19,10 @@
 - Já o aluno poderá visualizar suas fichas de treino prescritas, montar fichas de sua preferência (com validação do professor), registrar as cargas e repetições executadas no dia, além de monitorar sua própria evolução contínua de forma estruturada.
 
 # Tecnologias
-Front-end: React.js (JavaScript/TypeScript)
-Back-end: FastAPI ou Django (Python)
+Front-end: React.js (TypeScript)
+Back-end: Python (FastAPI)
 Banco de Dados: PostgreSQL
-Agentes de IA: GitHub Copilot (para auxílio no código) e Gemini/ChatGPT (para ideação de arquitetura e documentação)
+Agentes de IA: GitHub Copilot e Gemini
 
 # Histórias de Usuários
 
