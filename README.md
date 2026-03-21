@@ -1,17 +1,18 @@
-# projeto_eng_software
+# projeto_eng_software - Self-Fit
+
 
 # Integrantes do grupo
 Carlos Eduardo Santos Oliveira (Back-end): 
   Desenvolvimento da API (FastAPI), rotas, conexão com o banco de dados e autenticação.
 
 Gabrielli Valelia Sousa da Silva (Front-end): 
-  Construção da interface web responsiva (React), consumo da API e navegação do sistema.
+  Construção da interface web (React) focada na Visão do Aluno, consumo da API e navegação do sistema.
 
-Natalia Dias Santos Mota (Back-end): 
+Natalia Dias Santos Mota (Back-end e Arquitetura): 
   Modelagem do banco de dados (PostgreSQL), regras de negócio (cálculos de treino) e documentação geral.
 
-Pedro Alonso Araujo Silva (Full-stack / Infra): 
-  Configuração do GitHub, auxílio na integração front/back, testes básicos e deploy da aplicação.
+Pedro Alonso Araujo Silva (Front-end e Infra): 
+  Desenvolvimento da interface web focada na Visão do Professor (painéis de gestão), auxílio na integração front/back, testes básicos ambiente e deploy
 
 # Objetivo do Sistema
 - Desenvolver uma aplicação web responsiva voltada para a Gestão de Treinos de Musculação, centralizando a interação entre professores e alunos.
