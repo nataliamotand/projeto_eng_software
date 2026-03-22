@@ -6,13 +6,13 @@ Carlos Eduardo Santos Oliveira (Back-end):
   Desenvolvimento da API (FastAPI), rotas, conexão com o banco de dados e autenticação.
 
 Gabrielli Valelia Sousa da Silva (Front-end): 
-  Construção da interface web (React) focada na Visão do Aluno, consumo da API e navegação do sistema.
+  Construção da interface web (React), consumo da API e navegação do sistema.
 
 Natalia Dias Santos Mota (Back-end e Arquitetura): 
   Modelagem do banco de dados (PostgreSQL), regras de negócio (cálculos de treino) e documentação geral.
 
 Pedro Alonso Araujo Silva (Front-end e Infra): 
-  Desenvolvimento da interface web focada na Visão do Professor (painéis de gestão), auxílio na integração front/back, testes básicos ambiente e deploy
+  Desenvolvimento da interface web, auxílio na integração front/back, testes básicos ambiente e deploy
 
 # Objetivo do Sistema
 - Desenvolver uma aplicação web responsiva voltada para a Gestão de Treinos de Musculação, centralizando a interação entre professores e alunos.
@@ -20,7 +20,7 @@ Pedro Alonso Araujo Silva (Front-end e Infra):
 - Já o aluno poderá visualizar suas fichas de treino prescritas, montar fichas de sua preferência (com validação do professor), registrar as cargas e repetições executadas no dia, além de monitorar sua própria evolução contínua de forma estruturada.
 
 # Tecnologias
-Front-end: React.js (TypeScript)
+Front-end: React.js ou React Native
 Back-end: Python (FastAPI)
 Banco de Dados: PostgreSQL
 Agentes de IA: Cursor, Claude e Gemini
