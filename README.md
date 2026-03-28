@@ -48,6 +48,7 @@ Agentes de IA: Cursor, Claude e Gemini
 
 4. Como professor, eu quero receber notificações ou visualizar uma fila de "fichas propostas por alunos" para aprovar, editar ou rejeitar as sugestões.
 
+```mermaid
 flowchart LR
     %% Atores
     A([Aluno])
@@ -81,53 +82,4 @@ flowchart LR
     
     %% O Professor também pode visualizar o progresso do aluno
     P -.-> UC3
-
-    classDiagram
-    class Usuario {
-        +int id
-        +String nome
-        +String email
-        +String senha
-        +String tipoPerfil
-    }
-    
-    class Professor {
-        +String cref
-    }
-    
-    class Aluno {
-        +float peso
-        +float altura
-        +String objetivo
-    }
-    
-    class FichaTreino {
-        +int id
-        +String titulo
-        +Date dataCriacao
-        +String status
-    }
-    
-    class Exercicio {
-        +int id
-        +String nome
-        +String grupoMuscular
-        +int series
-        +int repeticoesBase
-        +float cargaEstimada
-    }
-    
-    class RegistroTreino {
-        +int id
-        +Date dataRealizacao
-        +float cargaReal
-        +int repeticoesReais
-    }
-    
-    Usuario <|-- Professor : herda
-    Usuario <|-- Aluno : herda
-    Professor "1" --> "*" FichaTreino : prescreve / avalia
-    Aluno "1" --> "*" FichaTreino : possui / propõe
-    FichaTreino "1" *-- "*" Exercicio : contém
-    Aluno "1" --> "*" RegistroTreino : executa
-    RegistroTreino "*" --> "1" Exercicio : refere-se a
+```
