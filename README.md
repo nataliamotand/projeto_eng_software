@@ -47,3 +47,87 @@ Agentes de IA: Cursor, Claude e Gemini
 3. Como professor, eu quero analisar o histórico de cargas e o progresso de um aluno para ajustar sua ficha de treino conforme a evolução dele.
 
 4. Como professor, eu quero receber notificações ou visualizar uma fila de "fichas propostas por alunos" para aprovar, editar ou rejeitar as sugestões.
+
+flowchart LR
+    %% Atores
+    A([Aluno])
+    P([Professor])
+
+    %% Sistema
+    subgraph Self-Fit [Sistema Self-Fit]
+        direction TB
+        UC1(Visualizar Ficha do Dia)
+        UC2(Registrar Cargas e Repetições)
+        UC3(Acompanhar Progresso de Hipertrofia/Força)
+        UC4(Propor Nova Ficha de Treino)
+        
+        UC5(Criar Ficha de Treino Personalizada)
+        UC6(Acompanhar Frequência de Alunos)
+        UC7(Analisar Histórico de Cargas)
+        UC8(Avaliar Ficha Proposta pelo Aluno)
+    end
+
+    %% Relações Aluno
+    A --> UC1
+    A --> UC2
+    A --> UC3
+    A --> UC4
+
+    %% Relações Professor
+    P --> UC5
+    P --> UC6
+    P --> UC7
+    P --> UC8
+    
+    %% O Professor também pode visualizar o progresso do aluno
+    P -.-> UC3
+
+    classDiagram
+    class Usuario {
+        +int id
+        +String nome
+        +String email
+        +String senha
+        +String tipoPerfil
+    }
+    
+    class Professor {
+        +String cref
+    }
+    
+    class Aluno {
+        +float peso
+        +float altura
+        +String objetivo
+    }
+    
+    class FichaTreino {
+        +int id
+        +String titulo
+        +Date dataCriacao
+        +String status
+    }
+    
+    class Exercicio {
+        +int id
+        +String nome
+        +String grupoMuscular
+        +int series
+        +int repeticoesBase
+        +float cargaEstimada
+    }
+    
+    class RegistroTreino {
+        +int id
+        +Date dataRealizacao
+        +float cargaReal
+        +int repeticoesReais
+    }
+    
+    Usuario <|-- Professor : herda
+    Usuario <|-- Aluno : herda
+    Professor "1" --> "*" FichaTreino : prescreve / avalia
+    Aluno "1" --> "*" FichaTreino : possui / propõe
+    FichaTreino "1" *-- "*" Exercicio : contém
+    Aluno "1" --> "*" RegistroTreino : executa
+    RegistroTreino "*" --> "1" Exercicio : refere-se a
