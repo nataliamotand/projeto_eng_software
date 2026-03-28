@@ -25,16 +25,23 @@ def raiz():
 
 @app.post("/usuarios", response_model=schemas.UsuarioResponse, summary="Cadastrar um novo usuário")
 def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
-    # Pega o Schema (JSON da internet) e transforma no Model (Tabela do Banco)
+    
+    # 1. Verifica no banco se o email já existe ANTES de tentar salvar
+    usuario_existente = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
+    if usuario_existente:
+        # Se existir, devolvemos um Erro 400 amigável e paramos por aqui
+        raise HTTPException(status_code=400, detail="Este email já está cadastrado no Self-Fit.")
+    
+    # 2. Se não existir, criamos o usuário normalmente
     db_usuario = models.Usuario(
         nome=usuario.nome,
         email=usuario.email,
         senha=usuario.senha,
         tipo_perfil=usuario.tipo_perfil
     )
-    db.add(db_usuario) # Prepara para salvar
-    db.commit()        # Salva de verdade no PostgreSQL (Neon)
-    db.refresh(db_usuario) # Atualiza a variável com o ID gerado pelo banco
+    db.add(db_usuario)
+    db.commit()
+    db.refresh(db_usuario)
     return db_usuario
 
 @app.get("/usuarios", response_model=list[schemas.UsuarioResponse], summary="Listar todos os usuários")
