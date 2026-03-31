@@ -58,13 +58,14 @@ const mockedRoutines = [
 ];
 
 function Header() {
+  const router = require('expo-router').useRouter();
+
   return (
     <View style={styles.header}>
       <View style={styles.headerDetail} pointerEvents="none" />
 
       <View style={styles.headerLeft}>
         <View style={styles.avatar}>
-          {/* TODO: substituir avatar se necessário */}
           <Image source={require('../assets/images/logo.png')} style={styles.avatarImage} resizeMode="contain" />
         </View>
         <View style={styles.userInfo}>
@@ -74,7 +75,7 @@ function Header() {
       </View>
 
       <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.iconTouch} onPress={() => { /* TODO: adicionar usuário */ }}>
+        <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/add_friends'); }}>
           <FontAwesome name="user-plus" size={20} color={colors.white} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconTouch} onPress={() => { /* TODO: notificações */ }}>
@@ -324,17 +325,22 @@ const styles = StyleSheet.create({
 
   bottomNav: {
     backgroundColor: colors.darkNav,
-    paddingVertical: 10,
+    height: 64,
+    paddingVertical: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
   },
-  navItem: { alignItems: 'center', justifyContent: 'center', width: 72 },
+  navItem: { alignItems: 'center', justifyContent: 'center', width: 72, height: 64 },
   centerNavWrapper: { alignItems: 'center', justifyContent: 'center' },
   centerButton: {
     backgroundColor: 'transparent',
     padding: 6,
     borderRadius: 28,
+    width: 56,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   centerIndicator: { marginTop: 6, width: 28, height: 3, backgroundColor: colors.red, borderRadius: 2 },
 });

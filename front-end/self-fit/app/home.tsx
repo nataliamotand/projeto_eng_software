@@ -25,6 +25,8 @@ const colors = {
 };
 
 function Header() {
+  const router = require('expo-router').useRouter();
+
   return (
     <View style={styles.header}>
       {/* decorative lighter curved detail top-right */}
@@ -44,7 +46,7 @@ function Header() {
       </View>
 
       <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.iconTouch} onPress={() => { /* TODO: go to add user */ }}>
+        <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/add_friends'); }}>
           <FontAwesome name="user-plus" size={20} color={colors.white} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconTouch} onPress={() => { /* TODO: open notifications */ }}>
@@ -183,7 +185,8 @@ const styles = StyleSheet.create({
 
   bottomNav: {
     backgroundColor: colors.darkNav,
-    paddingVertical: 10,
+    height: 64,
+    paddingVertical: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -192,6 +195,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     width: 72,
+    height: 64,
   },
   activeIndicator: {
     marginTop: 6,
