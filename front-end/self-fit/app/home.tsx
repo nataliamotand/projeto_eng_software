@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
 
@@ -59,18 +60,35 @@ function Content() {
 }
 
 function BottomNav() {
+  const router = useRouter();
+
   return (
     <View style={styles.bottomNav}>
-      <TouchableOpacity style={styles.navItem} onPress={() => { /* TODO: navigate to Home */ }}>
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => {
+          router.push('/home');
+        }}
+      >
         <FontAwesome name="home" size={24} color={colors.red} />
         <View style={styles.activeIndicator} />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.navItem} onPress={() => { /* TODO: navigate to Workouts */ }}>
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => {
+          router.push('/routines_and_workouts');
+        }}
+      >
         <MaterialIcons name="fitness-center" size={26} color={colors.gray} />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.navItem} onPress={() => { /* TODO: navigate to Profile */ }}>
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => {
+          router.push('/login');
+        }}
+      >
         <FontAwesome name="user" size={24} color={colors.gray} />
       </TouchableOpacity>
     </View>
