@@ -12,6 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 const { height, width } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ const colors = {
 };
 
 export default function Login(): JSX.Element {
+  const router = useRouter();
   const [login, setLogin] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [visible, setVisible] = useState<boolean>(false);
@@ -36,6 +38,16 @@ export default function Login(): JSX.Element {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              style={styles.backTouch}
+              accessibilityLabel="Voltar"
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={26} color={colors.white} />
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.top}>
             <Image source={require('../assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
           </View>
@@ -110,6 +122,15 @@ const styles = StyleSheet.create({
   top: {
     alignItems: 'center',
     marginTop: height * 0.08,
+  },
+  topRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backTouch: {
+    padding: 8,
+    marginTop: 6,
   },
   logo: {
     color: colors.white,
