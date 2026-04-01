@@ -88,7 +88,7 @@ function BottomNav() {
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => {
-          router.push('/login');
+          router.push('/profile');
         }}
       >
         <FontAwesome name="user" size={24} color={colors.gray} />
