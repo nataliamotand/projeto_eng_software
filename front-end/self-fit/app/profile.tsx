@@ -136,7 +136,7 @@ export default function Profile(): JSX.Element {
         </View>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => { /* TODO: abrir calendário detalhado */ }}>
+          <TouchableOpacity style={styles.actionButton} onPress={() => { router.push('/calendar'); }}>
             <View style={styles.actionLeft}>
               <FontAwesome name="calendar" size={18} color={colors.white} style={{ marginRight: 12 }} />
               <Text style={styles.actionText}>Calendário</Text>
@@ -144,7 +144,7 @@ export default function Profile(): JSX.Element {
             <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { /* TODO: abrir treinos */ }}>
+          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/routines_and_workouts'); }}>
             <View style={styles.actionLeft}>
               <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
               <Text style={styles.actionText}>Treinos</Text>

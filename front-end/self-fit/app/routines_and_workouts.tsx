@@ -141,6 +141,7 @@ function BottomNav() {
 
 export default function RoutinesAndWorkouts(): JSX.Element {
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const router = useRouter();
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -165,7 +166,7 @@ export default function RoutinesAndWorkouts(): JSX.Element {
                 style={styles.menuItem}
                 onPress={() => {
                   setShowNewMenu(false);
-                  // TODO: Navegar para criar nova rotina (form)
+                  router.push('/create_routine');
                 }}
               >
                 <FontAwesome name="plus-circle" size={18} color={colors.white} />
