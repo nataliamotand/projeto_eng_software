@@ -8,6 +8,8 @@ import {
   TouchableOpacity,
   FlatList,
   Dimensions,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,6 +27,7 @@ const colors = {
   inputBg: '#E5E5E5',
   white: '#FFFFFF',
   grayText: '#CFCFCF',
+  startGray: '#6B7280',
 };
 
 // TODO: Implementar lógica para obter o perfil real do usuário (STUDENT/TEACHER)
@@ -86,10 +89,10 @@ function Header() {
   );
 }
 
-function RoutineCard({ item }: { item: any }) {
+function RoutineCard({ item, onToggleMenu, onStart }: { item: any; onToggleMenu: () => void; onStart: () => void; }) {
   return (
     <View style={styles.card}>
-      <TouchableOpacity style={styles.cardOptions} onPress={() => { /* TODO: opções da rotina */ }}>
+      <TouchableOpacity style={styles.cardOptions} onPress={onToggleMenu}>
         <MaterialIcons name="more-vert" size={20} color={colors.grayText} />
       </TouchableOpacity>
 
@@ -109,7 +112,7 @@ function RoutineCard({ item }: { item: any }) {
         <Text style={styles.statText}>{`${item.series} Séries`}</Text>
       </View>
 
-      <TouchableOpacity style={styles.startButton} onPress={() => { /* TODO: iniciar rotina */ }}>
+      <TouchableOpacity style={styles.startButton} onPress={onStart}>
         <Text style={styles.startButtonText}>Iniciar Rotina</Text>
       </TouchableOpacity>
     </View>
@@ -141,7 +144,23 @@ function BottomNav() {
 
 export default function RoutinesAndWorkouts(): JSX.Element {
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [routines, setRoutines] = useState(mockedRoutines);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const router = useRouter();
+
+  function handleToggleMenu(id: number) {
+    setOpenMenuId((cur) => (cur === id ? null : id));
+  }
+
+  function handleEdit(id: number) {
+    setOpenMenuId(null);
+    router.push(`/create_routine?id=${id}`);
+  }
+
+  function handleDelete(id: number) {
+    setOpenMenuId(null);
+    setRoutines((prev) => prev.filter((r) => r.id !== id));
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -195,13 +214,35 @@ export default function RoutinesAndWorkouts(): JSX.Element {
           </View>
 
           {USER_PROFILE === 'STUDENT' && (
-            <FlatList
-              data={mockedRoutines}
-              keyExtractor={(r) => String(r.id)}
-              renderItem={({ item }) => <RoutineCard item={item} />}
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-            />
+            <>
+              <FlatList
+                data={routines}
+                keyExtractor={(r) => String(r.id)}
+                renderItem={({ item }) => (
+                  <RoutineCard
+                    item={item}
+                    onToggleMenu={() => handleToggleMenu(item.id)}
+                    onStart={() => router.push(`/workout?id=${item.id}`)}
+                  />
+                )}
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+              />
+
+              <Modal visible={openMenuId !== null} transparent animationType="fade" onRequestClose={() => setOpenMenuId(null)}>
+                <Pressable style={styles.modalBackdrop} onPress={() => setOpenMenuId(null)}>
+                  <View style={styles.modalContentCentered}>
+                    <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleEdit(openMenuId as number)}>
+                      <Text style={styles.modalOptionText}>Editar rotina</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={[styles.modalOptionButton, { marginTop: 8 }]} onPress={() => handleDelete(openMenuId as number)}>
+                      <Text style={[styles.modalOptionText, { color: colors.red }]}>Excluir rotina</Text>
+                    </TouchableOpacity>
+                  </View>
+                </Pressable>
+              </Modal>
+            </>
           )}
 
           {USER_PROFILE === 'TEACHER' && (
@@ -315,7 +356,7 @@ const styles = StyleSheet.create({
 
   startButton: {
     marginTop: 12,
-    backgroundColor: colors.red,
+    backgroundColor: colors.startGray,
     height: 40,
     borderRadius: 10,
     alignItems: 'center',
@@ -323,6 +364,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   startButtonText: { color: colors.white, fontWeight: '700' },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalContentCentered: {
+    backgroundColor: '#0A0A0A',
+    padding: 20,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderColor: '#111',
+    borderWidth: 1,
+    alignItems: 'stretch',
+    width: '100%',
+  },
+  modalOptionButton: {
+    backgroundColor: '#111',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalOptionText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: '700',
+  },
 
   bottomNav: {
     backgroundColor: colors.darkNav,

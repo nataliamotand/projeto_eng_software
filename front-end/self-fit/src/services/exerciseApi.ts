@@ -23,14 +23,40 @@ const defaultHeaders: Record<string, string> = {
 async function fetchJson(path: string): Promise<any> {
   const url = `${BASE}${path}`;
   const res = await fetch(url, { headers: defaultHeaders });
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch (err) {
-    // if response already an object, return as-is
+
+  // If the API requires payment (402), fall back to a bundled local dataset
+  if (res.status === 402) {
+    console.warn(`exerciseApi: remote API returned 402 Payment Required, using local fallback for ${path}`);
     try {
+      // dynamic import ensures bundlers include the JSON
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-ignore
-      return res;
+      const mod = await import('./exerciseFallback.json');
+      const fallback = mod?.default || mod;
+      return fallback;
+    } catch (e) {
+      console.error('Failed to load local exercise fallback', e);
+      const text = await res.text().catch(() => '');
+      const msg = `Fetch error ${res.status} ${res.statusText} - ${text}`;
+      throw new Error(msg);
+    }
+  }
+
+  // Surface HTTP errors so callers can handle them instead of silently returning Response objects
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const msg = `Fetch error ${res.status} ${res.statusText} - ${text}`;
+    throw new Error(msg);
+  }
+
+  // Prefer using res.json() which will parse JSON or throw if invalid
+  try {
+    return await res.json();
+  } catch (err) {
+    // fallback: try text then parse
+    const text = await res.text().catch(() => '');
+    try {
+      return JSON.parse(text);
     } catch (e) {
       throw err;
     }
