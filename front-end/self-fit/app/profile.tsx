@@ -90,7 +90,7 @@ export default function Profile(): JSX.Element {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.settingsWrap}>
-        <TouchableOpacity onPress={() => { /* TODO: open settings */ }} style={styles.iconTouch}>
+        <TouchableOpacity onPress={() => { router.push('/edit_profile'); }} style={styles.iconTouch}>
           <Ionicons name="settings-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
@@ -148,6 +148,22 @@ export default function Profile(): JSX.Element {
             <View style={styles.actionLeft}>
               <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
               <Text style={styles.actionText}>Treinos</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/measures'); }}>
+            <View style={styles.actionLeft}>
+              <MaterialIcons name="monitor-weight" size={18} color={colors.white} style={{ marginRight: 12 }} />
+              <Text style={styles.actionText}>Medições</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/metrics'); }}>
+            <View style={styles.actionLeft}>
+              <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
+              <Text style={styles.actionText}>Métricas</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
           </TouchableOpacity>
