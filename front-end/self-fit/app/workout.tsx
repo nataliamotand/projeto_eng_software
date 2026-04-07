@@ -13,6 +13,7 @@ import {
   Pressable,
   Dimensions,
 } from 'react-native';
+import ImageRotator from '../src/components/ui/image-rotator';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -27,6 +28,28 @@ const colors = {
   cardBg: '#0A0A0A',
   rowDone: '#133A13',
   rowPending: '#111',
+};
+
+const muscleMap: Record<string, string> = {
+  "upper back": "Costas (parte de cima)",
+  "triceps": "Tríceps",
+  "traps": "Trapézio",
+  "spine": "Lombar",
+  "serratus anterior": "Serrátil",
+  "quads": "Quadríceps",
+  "pectorals": "Peito",
+  "levator scapulae": "Pescoço",
+  "lats": "Costas",
+  "hamstrings": "Posterior de coxa",
+  "glutes": "Glúteos",
+  "forearms": "Antebraço",
+  "delts": "Ombro",
+  "cardiovascular system": "Cardio",
+  "calves": "Panturrilha",
+  "biceps": "Bíceps",
+  "adductors": "Adutor",
+  "abs": "Abdômen",
+  "abductors": "Abdutor"
 };
 
 // Timer isolated to avoid re-rendering the whole list every second
@@ -59,6 +82,8 @@ type WorkoutExercise = {
   id: string | number;
   name: string;
   image?: string;
+  images?: string[];
+  target?: string;
   tracking: 'strength' | 'cardio';
   sets: SetRow[];
 };
@@ -156,7 +181,8 @@ export default function Workout(): JSX.Element {
             return {
               id: p.id ?? `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
               name: p.name || p.title || '',
-              image: p.image || p.gifUrl || '',
+              images: p.images && p.images.length ? p.images : p.image ? [p.image] : p.gifUrl ? [p.gifUrl] : [],
+              target: p.target || p.muscle || '',
               tracking,
               sets: defaultSets,
             } as WorkoutExercise;
@@ -251,9 +277,10 @@ export default function Workout(): JSX.Element {
         {workoutData.map((ex) => (
           <View key={String(ex.id)} style={styles.card}>
             <View style={styles.cardHeader}>
-              <Image source={ex.image ? { uri: ex.image } : require('../assets/images/logo.png')} style={styles.exImage} />
+              <ImageRotator images={ex.images && ex.images.length ? ex.images : ex.image ? [ex.image] : []} style={styles.exImage} />
               <View style={styles.cardHeaderCenter}>
                 <Text style={styles.exName}>{ex.name}</Text>
+                {ex.target ? <Text style={styles.exTarget}>{muscleMap[String(ex.target).toLowerCase()] || ex.target}</Text> : null}
               </View>
               <TouchableOpacity onPress={() => openMenuFor(ex.id)}>
                 <Ionicons name="ellipsis-vertical" size={20} color={colors.grayLight} />
@@ -396,6 +423,7 @@ const styles = StyleSheet.create({
   exImage: { width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#222' },
   cardHeaderCenter: { flex: 1 },
   exName: { color: colors.white, fontWeight: '700' },
+  exTarget: { color: colors.grayLight, fontSize: 12, marginTop: 4 },
 
   setsTable: { marginTop: 12 },
   setsHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#111' },

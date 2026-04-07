@@ -65,20 +65,31 @@ export function useExercises(initialLimit?: number): UseExercisesReturn {
       let mounted = true;
       setIsLoading(true);
       setError(null);
-      api
-        .getExercisesByTarget(muscleFilter)
-        .then((res) => {
-          if (!mounted) return;
-          setExercises(res || []);
-          setHasMore(false);
-        })
-        .catch((err) => {
+      (async () => {
+        try {
+          // Special-case: Cardio filter should match exercises whose category includes 'card'
+          if (String(muscleFilter).toLowerCase() === 'cardio') {
+            const all = await api.getAllExercises(1000, 0);
+            if (!mounted) return;
+            const filtered = (Array.isArray(all) ? all : []).filter((it: any) => {
+              const cat = String(it.raw?.category || it.category || '').toLowerCase();
+              return cat.includes('card');
+            });
+            setExercises(filtered || []);
+            setHasMore(false);
+          } else {
+            const res = await api.getExercisesByTarget(muscleFilter);
+            if (!mounted) return;
+            setExercises(res || []);
+            setHasMore(false);
+          }
+        } catch (err) {
           console.error('useExercises filter error', err);
           setError('Falha ao filtrar por músculo');
-        })
-        .finally(() => {
+        } finally {
           if (mounted) setIsLoading(false);
-        });
+        }
+      })();
 
       return () => {
         mounted = false;

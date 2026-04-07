@@ -8,14 +8,15 @@ import {
 	TextInput,
 	TouchableOpacity,
 	FlatList,
-	Image,
 	ActivityIndicator,
 	Dimensions,
 	ScrollView,
 } from 'react-native';
+import ImageRotator from '../src/components/ui/image-rotator';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useExercises } from '../src/hooks/useExercises';
+import { muscleOptions, displayMuscleLabel } from '../src/constants/muscles';
 
 const { width } = Dimensions.get('window');
 
@@ -28,29 +29,7 @@ const colors = {
 	grayMid: '#AFAFAF',
 };
 
-// Tradução dos alvos da API (inglês -> Português)
-// keys are lower-cased to match API targets normalized to lower-case
-const muscleMap: Record<string, string> = {
-  "upper back": "Costas (parte de cima)",
-  "triceps": "Tríceps",
-  "traps": "Trapézio",
-  "spine": "Lombar",
-  "serratus anterior": "Serrátil",
-  "quads": "Quadríceps",
-  "pectorals": "Peito",
-  "levator scapulae": "Pescoço",
-  "lats": "Costas",
-  "hamstrings": "Posterior de coxa",
-  "glutes": "Glúteos",
-  "forearms": "Antebraço",
-  "delts": "Ombro",
-  "cardiovascular system": "Cardio",
-  "calves": "Panturrilha",
-  "biceps": "Bíceps",
-  "adductors": "Adutor",
-  "abs": "Abdômen",
-  "abductors": "Abdutor"
-};
+// imported shared muscle options and label helper
 
 type Exercise = {
 	id?: string | number;
@@ -103,6 +82,8 @@ export default function ChooseExercise(): JSX.Element {
 		const id = item.id ?? item.name;
 		const isSelected = selectedExercises.includes(id as string | number);
 
+		const targetRaw = (item.target || item.muscle || '').toString();
+		const targetLabel = targetRaw ? displayMuscleLabel(targetRaw) : '';
 
 		return (
 			<TouchableOpacity
@@ -111,11 +92,11 @@ export default function ChooseExercise(): JSX.Element {
 			>
 				{isSelected && <View style={styles.selectedBar} />}
 
-				<Image source={{ uri: item.gifUrl || item.gifUrl }} style={styles.thumb} resizeMode="contain" />
+				<ImageRotator images={item.images && item.images.length ? item.images : item.gifUrl ? [item.gifUrl] : []} style={styles.thumb} />
 
 				<View style={styles.cardCenter}>
 					<Text style={styles.exerciseName}>{item.name}</Text>
-					<Text style={styles.exerciseTarget}>{(item.target || item.muscle || '').toString()}</Text>
+					<Text style={styles.exerciseTarget}>{targetLabel}</Text>
 				</View>
 
 				<View style={styles.cardRight}>
@@ -153,19 +134,19 @@ export default function ChooseExercise(): JSX.Element {
 				</View>
 
 				{/* Chips horizontal filter (Todos + muscleMap) */}
-				<View style={styles.filterRow}>
-					<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 6 }}>
-						<TouchableOpacity style={[styles.chip, selectedMuscle === null ? styles.chipActive : null]} onPress={() => setSelectedMuscle(null)}>
-							<Text style={[styles.chipText, selectedMuscle === null ? styles.chipTextActive : null]}>Todos</Text>
-						</TouchableOpacity>
+							<View style={styles.filterRow}>
+								<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingVertical: 6 }}>
+									<TouchableOpacity style={[styles.chip, selectedMuscle === null ? styles.chipActive : null]} onPress={() => setSelectedMuscle(null)}>
+										<Text style={[styles.chipText, selectedMuscle === null ? styles.chipTextActive : null]}>Todos</Text>
+									</TouchableOpacity>
 
-						{Object.entries(muscleMap).map(([key, label]) => (
-							<TouchableOpacity key={key} style={[styles.chip, selectedMuscle === key ? styles.chipActive : null, { marginLeft: 8 }]} onPress={() => setSelectedMuscle(key)}>
-								<Text style={[styles.chipText, selectedMuscle === key ? styles.chipTextActive : null]}>{label}</Text>
-							</TouchableOpacity>
-						))}
-					</ScrollView>
-				</View>
+									{muscleOptions.map((key) => (
+										<TouchableOpacity key={key} style={[styles.chip, selectedMuscle === key ? styles.chipActive : null, { marginLeft: 8 }]} onPress={() => setSelectedMuscle(key)}>
+											<Text style={[styles.chipText, selectedMuscle === key ? styles.chipTextActive : null]}>{displayMuscleLabel(key)}</Text>
+										</TouchableOpacity>
+									))}
+								</ScrollView>
+							</View>
 
 
 
@@ -203,16 +184,17 @@ export default function ChooseExercise(): JSX.Element {
 							// @ts-ignore
 							const existing = Array.isArray(globalThis.__CURRENT_ROUTINE_EXERCISES) ? new Set(globalThis.__CURRENT_ROUTINE_EXERCISES.map((e: any) => String(e.id))) : new Set();
 							chosen = data
-								.filter((it) => selectedExercises.includes(it.id ?? it.name) && !existing.has(String(it.id ?? it.name)))
-								.map((it) => ({
-									id: it.id ?? it.name,
-									name: it.name,
-									image: it.gifUrl || it.gif || it.image || '',
-									sets: [{ weight: '', reps: '', distance: '', time: '', floors: '' }],
-								}));
+									.filter((it) => selectedExercises.includes(it.id ?? it.name) && !existing.has(String(it.id ?? it.name)))
+									.map((it) => ({
+										id: it.id ?? it.name,
+										name: it.name,
+										images: it.images && it.images.length ? it.images : it.gifUrl ? [it.gifUrl] : [],
+										target: it.target || it.muscle || '',
+										sets: [{ weight: '', reps: '', distance: '', time: '', floors: '' }],
+									}));
 						} catch (e) {
 							// fallback: include all selected
-							chosen = data.filter((it) => selectedExercises.includes(it.id ?? it.name)).map((it) => ({ id: it.id ?? it.name, name: it.name, image: it.gifUrl || it.gif || it.image || '', sets: [{ weight: '', reps: '', distance: '', time: '', floors: '' }] }));
+							chosen = data.filter((it) => selectedExercises.includes(it.id ?? it.name)).map((it) => ({ id: it.id ?? it.name, name: it.name, images: it.images && it.images.length ? it.images : it.gifUrl ? [it.gifUrl] : [], target: it.target || it.muscle || '', sets: [{ weight: '', reps: '', distance: '', time: '', floors: '' }] }));
 						}
 						try {
 							// store on globalThis for the next screen to read

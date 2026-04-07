@@ -2,73 +2,43 @@
 export interface Exercise {
   id: string;
   name: string;
-  bodyPart: string;
-  equipment: string;
-  target: string;
-  gifUrl: string;
+  bodyPart?: string;
+  equipment?: string;
+  target?: string;
+  images?: string[];
+  gifUrl?: string;
   secondaryMuscles?: string[];
   instructions?: string[];
+  raw?: any;
   [key: string]: any;
 }
 
-const BASE = 'https://exercisedb.dev/api/v1';
+// Use only the bundled fallback JSON. Build full image URLs from filenames in `images`.
+const IMAGE_BASE = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/';
 
-// TODO: If an API key is required in the future, provide it via .env and include in headers here.
-const defaultHeaders: Record<string, string> = {
-  'Accept': 'application/json',
-  'Content-Type': 'application/json',
-  // 'Authorization': `Bearer ${process.env.EXERCISEDB_KEY}` // example
-};
-
-async function fetchJson(path: string): Promise<any> {
-  const url = `${BASE}${path}`;
-  const res = await fetch(url, { headers: defaultHeaders });
-
-  // If the API requires payment (402), fall back to a bundled local dataset
-  if (res.status === 402) {
-    console.warn(`exerciseApi: remote API returned 402 Payment Required, using local fallback for ${path}`);
-    try {
-      // dynamic import ensures bundlers include the JSON
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      const mod = await import('./exerciseFallback.json');
-      const fallback = mod?.default || mod;
-      return fallback;
-    } catch (e) {
-      console.error('Failed to load local exercise fallback', e);
-      const text = await res.text().catch(() => '');
-      const msg = `Fetch error ${res.status} ${res.statusText} - ${text}`;
-      throw new Error(msg);
-    }
-  }
-
-  // Surface HTTP errors so callers can handle them instead of silently returning Response objects
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    const msg = `Fetch error ${res.status} ${res.statusText} - ${text}`;
-    throw new Error(msg);
-  }
-
-  // Prefer using res.json() which will parse JSON or throw if invalid
-  try {
-    return await res.json();
-  } catch (err) {
-    // fallback: try text then parse
-    const text = await res.text().catch(() => '');
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      throw err;
-    }
-  }
+// dynamic import so bundlers include the JSON
+async function loadFallback(): Promise<any[]> {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore
+  const mod = await import('./exercises.json');
+  const arr = mod?.default || mod || [];
+  return Array.isArray(arr) ? arr : [];
 }
 
 function normalizeExercise(raw: any): Exercise {
-  // The API may return different property names; map to our interface
-  const id = raw.exerciseId || raw.id || raw._id || String(raw.id || raw.exerciseId || raw._id || raw.name || '');
+  const id = raw.id || raw._id || raw.exerciseId || raw.name || Math.random().toString(36).slice(2);
   const name = raw.name || raw.title || '';
-  const gifUrl = raw.gifUrl || raw.gif || raw.image || '';
-  const target = Array.isArray(raw.targetMuscles) ? (raw.targetMuscles[0] || '') : raw.target || '';
+  // raw may contain `images` array with filenames — build full URLs
+  const imagesRaw = Array.isArray(raw.images) ? raw.images : raw.images ? [raw.images] : [];
+  const images = imagesRaw.map((f: string) => (typeof f === 'string' ? `${IMAGE_BASE}${f}` : '')).filter(Boolean);
+  const gifUrl = images[0] || raw.gifUrl || raw.gif || raw.image || '';
+  const targetCandidates = [] as string[];
+  if (Array.isArray(raw.primaryMuscles)) targetCandidates.push(...raw.primaryMuscles);
+  if (Array.isArray(raw.primary_muscles)) targetCandidates.push(...raw.primary_muscles);
+  if (Array.isArray(raw.targetMuscles)) targetCandidates.push(...raw.targetMuscles);
+  if (raw.target) targetCandidates.push(raw.target);
+  if (raw.muscle) targetCandidates.push(raw.muscle);
+  const target = String((targetCandidates.find(Boolean) || '')).trim();
   const bodyPart = Array.isArray(raw.bodyParts) ? (raw.bodyParts[0] || '') : raw.bodyPart || '';
   const equipment = Array.isArray(raw.equipments) ? (raw.equipments[0] || '') : raw.equipment || '';
   const secondaryMuscles = raw.secondaryMuscles || raw.secondary_muscles || [];
@@ -80,6 +50,7 @@ function normalizeExercise(raw: any): Exercise {
     bodyPart: String(bodyPart),
     equipment: String(equipment),
     target: String(target),
+    images,
     gifUrl: String(gifUrl),
     secondaryMuscles,
     instructions,
@@ -89,14 +60,8 @@ function normalizeExercise(raw: any): Exercise {
 
 export async function getAllExercises(limit?: number, offset?: number): Promise<Exercise[]> {
   try {
-    const params: string[] = [];
-    if (limit) params.push(`limit=${encodeURIComponent(String(limit))}`);
-    if (offset) params.push(`offset=${encodeURIComponent(String(offset))}`);
-    const query = params.length ? `?${params.join('&')}` : '';
-    const json = await fetchJson(`/exercises${query}`);
-    // API may return { success, data: [...] } or an array
-    const items = Array.isArray(json) ? json : json?.data || json?.results || [];
-    if (!Array.isArray(items)) return [];
+    const all = await loadFallback();
+    const items = all.slice(offset || 0, limit ? (offset || 0) + limit : undefined);
     return items.map(normalizeExercise);
   } catch (err) {
     console.error('exerciseApi.getAllExercises error', err);
@@ -107,11 +72,10 @@ export async function getAllExercises(limit?: number, offset?: number): Promise<
 export async function searchExercisesByName(name: string, limit?: number): Promise<Exercise[]> {
   try {
     if (!name || name.trim() === '') return [];
-    const q = encodeURIComponent(name.trim());
-    const params = limit ? `?q=${q}&limit=${limit}` : `?q=${q}`;
-    const json = await fetchJson(`/exercises/search${params}`);
-    const items = Array.isArray(json) ? json : json?.data || json?.results || [];
-    if (!Array.isArray(items)) return [];
+    const all = await loadFallback();
+    const q = name.trim().toLowerCase();
+    const filtered = all.filter((it: any) => String(it.name || it.title || '').toLowerCase().includes(q));
+    const items = filtered.slice(0, limit || filtered.length);
     return items.map(normalizeExercise);
   } catch (err) {
     console.error('exerciseApi.searchExercisesByName error', err);
@@ -122,10 +86,18 @@ export async function searchExercisesByName(name: string, limit?: number): Promi
 export async function getExercisesByTarget(muscle: string): Promise<Exercise[]> {
   try {
     if (!muscle || muscle.trim() === '') return [];
-    const json = await fetchJson(`/muscles/${encodeURIComponent(muscle.trim())}/exercises`);
-    const items = Array.isArray(json) ? json : json?.data || json?.results || [];
-    if (!Array.isArray(items)) return [];
-    return items.map(normalizeExercise);
+    const all = await loadFallback();
+    const q = muscle.trim().toLowerCase();
+    const filtered = all.filter((it: any) => {
+      const targets: string[] = [];
+      if (Array.isArray(it.primaryMuscles)) targets.push(...it.primaryMuscles);
+      if (Array.isArray(it.primary_muscles)) targets.push(...it.primary_muscles);
+      if (Array.isArray(it.targetMuscles)) targets.push(...it.targetMuscles);
+      if (it.target) targets.push(it.target);
+      if (it.muscle) targets.push(it.muscle);
+      return targets.map((t: any) => String(t).toLowerCase()).includes(q) || String((targets[0]) || '').toLowerCase() === q;
+    });
+    return filtered.map(normalizeExercise);
   } catch (err) {
     console.error('exerciseApi.getExercisesByTarget error', err);
     return [];
@@ -134,23 +106,18 @@ export async function getExercisesByTarget(muscle: string): Promise<Exercise[]> 
 
 export async function getAllTargetMuscles(): Promise<string[]> {
   try {
-    const json = await fetchJson('/muscles');
-    const items = Array.isArray(json) ? json : json?.data || json?.results || [];
-    if (!Array.isArray(items)) return [];
-    // items may be strings or objects with a name property
-    const muscles = items.map((it: any) => (typeof it === 'string' ? it : it.name || it.muscle || ''))
-      .filter(Boolean);
-    return Array.from(new Set(muscles)).sort();
+    const all = await loadFallback();
+    const set = new Set<string>();
+    for (const it of all) {
+      if (it.target) set.add(String(it.target));
+      if (it.muscle) set.add(String(it.muscle));
+      if (Array.isArray(it.primaryMuscles)) for (const tt of it.primaryMuscles) if (tt) set.add(String(tt));
+      if (Array.isArray(it.primary_muscles)) for (const tt of it.primary_muscles) if (tt) set.add(String(tt));
+      if (Array.isArray(it.targetMuscles)) for (const tt of it.targetMuscles) if (tt) set.add(String(tt));
+    }
+    return Array.from(set).filter(Boolean).sort();
   } catch (err) {
     console.error('exerciseApi.getAllTargetMuscles error', err);
-    // fallback: try derive from exercises
-    try {
-      const all = await getAllExercises(1000);
-      const set = new Set<string>();
-      for (const ex of all) if (ex && ex.target) set.add(String(ex.target));
-      return Array.from(set).sort();
-    } catch (e) {
-      return [];
-    }
+    return [];
   }
 }

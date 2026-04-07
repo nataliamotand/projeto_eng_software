@@ -13,6 +13,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
+import ImageRotator from '../src/components/ui/image-rotator';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -27,12 +28,36 @@ const colors = {
   grayMid: '#9A9A9A',
 };
 
+const muscleMap: Record<string, string> = {
+  "upper back": "Costas (parte de cima)",
+  "triceps": "Tríceps",
+  "traps": "Trapézio",
+  "spine": "Lombar",
+  "serratus anterior": "Serrátil",
+  "quads": "Quadríceps",
+  "pectorals": "Peito",
+  "levator scapulae": "Pescoço",
+  "lats": "Costas",
+  "hamstrings": "Posterior de coxa",
+  "glutes": "Glúteos",
+  "forearms": "Antebraço",
+  "delts": "Ombro",
+  "cardiovascular system": "Cardio",
+  "calves": "Panturrilha",
+  "biceps": "Bíceps",
+  "adductors": "Adutor",
+  "abs": "Abdômen",
+  "abductors": "Abdutor"
+};
+
 type SetRow = { id?: string | number; reps?: string; weight?: string; distance?: string; time?: string; floors?: string };
 
 type RoutineExercise = {
   id: string | number;
   name: string;
   image?: string;
+  images?: string[]; // existing line
+  target?: string; // new line added
   notes?: string;
   restEnabled?: boolean;
   sets: SetRow[];
@@ -86,10 +111,15 @@ export default function CreateRoutine(): JSX.Element {
           const toAdd: RoutineExercise[] = added.map((p: any) => ({
             id: p.id,
             name: p.name || p.title || '',
-            image: p.image || p.gifUrl || '',
+            image: undefined,
+            target: p.target || p.muscle || '',
             notes: p.notes || '',
             restEnabled: false,
             sets: Array.isArray(p.sets) && p.sets.length > 0 ? p.sets : [createEmptySet()],
+            // keep images on original payload if present (consumers may read `images`)
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            images: p.images && p.images.length ? p.images : p.image ? [p.image] : p.gifUrl ? [p.gifUrl] : [],
           } as RoutineExercise));
 
           setSelectedExercises((prev) => {
@@ -238,9 +268,10 @@ export default function CreateRoutine(): JSX.Element {
             {selectedExercises.map((ex) => (
               <View key={String(ex.id)} style={styles.card}>
                 <View style={styles.cardHeader}>
-                  <Image source={{ uri: ex.image }} style={styles.exImage} />
+                  <ImageRotator images={ex.images && ex.images.length ? ex.images : ex.image ? [ex.image] : []} style={styles.exImage} />
                   <View style={styles.cardHeaderCenter}>
                     <Text style={styles.exName}>{ex.name}</Text>
+                    {ex.target ? <Text style={styles.exTarget}>{muscleMap[String(ex.target).toLowerCase()] || ex.target}</Text> : null}
                   </View>
                   <TouchableOpacity onPress={() => openMenuFor(ex.id)}>
                     <Ionicons name="ellipsis-vertical" size={20} color={colors.grayLight} />
@@ -450,6 +481,7 @@ const styles = StyleSheet.create({
   },
   updateButton: {
     backgroundColor: colors.red,
+  exTarget: { color: '#9A9A9A', fontSize: 12, marginTop: 4 },
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
