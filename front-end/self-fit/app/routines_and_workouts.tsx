@@ -4,6 +4,7 @@ import {
   View,
   Text,
   StyleSheet,
+  TextInput,
   Image,
   TouchableOpacity,
   FlatList,
@@ -144,6 +145,8 @@ function BottomNav() {
 
 export default function RoutinesAndWorkouts(): JSX.Element {
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+  const [requestMessage, setRequestMessage] = useState('');
   const [routines, setRoutines] = useState(mockedRoutines);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const router = useRouter();
@@ -196,7 +199,7 @@ export default function RoutinesAndWorkouts(): JSX.Element {
                 style={styles.menuItem}
                 onPress={() => {
                   setShowNewMenu(false);
-                  // TODO: Abrir fluxo de solicitação de rotina
+                  setShowRequestModal(true);
                 }}
               >
                 <Ionicons name="mail" size={18} color={colors.white} />
@@ -204,6 +207,49 @@ export default function RoutinesAndWorkouts(): JSX.Element {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Modal de solicitação de rotina */}
+          <Modal visible={showRequestModal} transparent animationType="slide" onRequestClose={() => setShowRequestModal(false)}>
+            <Pressable style={styles.modalBackdrop} onPress={() => setShowRequestModal(false)}>
+              <View style={styles.modalContentCentered}>
+                <Text style={{ color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 8 }}>Solicitar nova rotina</Text>
+                <Text style={{ color: colors.grayText, marginBottom: 12 }}>Escreva sua solicitação ao professor/personal:</Text>
+                <TextInput
+                  style={styles.requestInput}
+                  placeholder="Descreva os objetivos, limitações e preferências..."
+                  placeholderTextColor="#9A9A9A"
+                  multiline
+                  numberOfLines={4}
+                  value={requestMessage}
+                  onChangeText={setRequestMessage}
+                />
+
+                <View style={styles.requestButtonsRow}>
+                  <TouchableOpacity
+                    style={[styles.requestButton, { backgroundColor: colors.darkRed }]}
+                    onPress={() => {
+                      // Simular envio: aqui você pode integrar com backend/rota de mensagens
+                      console.log('Solicitação enviada:', requestMessage);
+                      setRequestMessage('');
+                      setShowRequestModal(false);
+                    }}
+                  >
+                    <Text style={[styles.requestButtonText, { color: colors.white }]}>Enviar</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.requestButton, { backgroundColor: '#222', marginLeft: 8 }]}
+                    onPress={() => {
+                      setRequestMessage('');
+                      setShowRequestModal(false);
+                    }}
+                  >
+                    <Text style={[styles.requestButtonText, { color: colors.grayText }]}>Cancelar</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </Pressable>
+          </Modal>
 
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>ROTINAS</Text>
@@ -393,6 +439,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+
+  requestInput: {
+    backgroundColor: '#0B0B0B',
+    borderColor: '#222',
+    borderWidth: 1,
+    color: colors.white,
+    padding: 12,
+    borderRadius: 8,
+    textAlignVertical: 'top',
+    minHeight: 100,
+    marginBottom: 12,
+  },
+  requestButtonsRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  requestButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  requestButtonText: { fontWeight: '700' },
 
   bottomNav: {
     backgroundColor: colors.darkNav,
