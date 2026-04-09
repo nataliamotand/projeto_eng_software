@@ -102,10 +102,6 @@ export default function Login(): JSX.Element {
             </TouchableOpacity>
 
             {error ? <Text style={{ color: '#FF6666', marginTop: 8 }}>{error}</Text> : null}
-
-            <TouchableOpacity style={styles.linkTouch} accessibilityRole="link">
-              <Text style={styles.linkText}>Esqueceu sua senha?</Text>
-            </TouchableOpacity>
           </View>
 
           <View style={styles.footer}>
