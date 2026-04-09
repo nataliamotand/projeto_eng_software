@@ -80,7 +80,7 @@ export default function ClientDetails(): JSX.Element {
         </View>
 
         <View style={styles.sectionGrid}>
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => { /* TODO: ver treinos */ }}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => { router.push(`/previous_workouts?studentId=${studentId}`); }}>
             <View style={styles.secondaryLeft}><MaterialIcons name="calendar-today" size={20} color={colors.white} /></View>
             <Text style={styles.secondaryText}>Visualizar treinos</Text>
           </TouchableOpacity>
