@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
-import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 const { width } = Dimensions.get('window');
@@ -177,6 +177,10 @@ export default function Profile(): JSX.Element {
 
         <TouchableOpacity style={styles.navItem} onPress={() => { router.push('/routines_and_workouts'); }}>
           <MaterialIcons name="fitness-center" size={26} color={colors.grayText} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.navItem} onPress={() => { router.push('/clients'); }}>
+          <MaterialCommunityIcons name="account-group" size={24} color={colors.grayText} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.navItem} onPress={() => { /* already on profile */ }}>

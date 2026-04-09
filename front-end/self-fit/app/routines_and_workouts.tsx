@@ -12,7 +12,7 @@ import {
   Modal,
   Pressable,
 } from 'react-native';
-import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -135,6 +135,10 @@ function BottomNav() {
         </TouchableOpacity>
         <View style={styles.centerIndicator} />
       </View>
+
+      <TouchableOpacity style={styles.navItem} onPress={() => router.push('/clients')}>
+        <MaterialCommunityIcons name="account-group" size={24} color={colors.grayText} />
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
         <FontAwesome name="user" size={24} color={colors.grayText} />

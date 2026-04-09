@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
@@ -83,6 +83,15 @@ function BottomNav() {
         }}
       >
         <MaterialIcons name="fitness-center" size={26} color={colors.gray} />
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.navItem}
+        onPress={() => {
+          router.push('/clients');
+        }}
+      >
+        <MaterialCommunityIcons name="account-group" size={24} color={colors.gray} />
       </TouchableOpacity>
 
       <TouchableOpacity
