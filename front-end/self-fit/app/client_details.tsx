@@ -90,7 +90,7 @@ export default function ClientDetails(): JSX.Element {
             <Text style={styles.secondaryText}>Visualizar medições</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => { /* TODO: ver métricas */ }}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => { router.push(`/metrics?studentId=${studentId}`); }}>
             <View style={styles.secondaryLeft}><MaterialIcons name="insights" size={20} color={colors.white} /></View>
             <Text style={styles.secondaryText}>Visualizar métricas</Text>
           </TouchableOpacity>
