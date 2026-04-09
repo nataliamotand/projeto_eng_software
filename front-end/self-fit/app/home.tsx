@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,6 +7,8 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  FlatList,
+  Modal,
 } from 'react-native';
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
@@ -23,6 +25,54 @@ const colors = {
   white: '#FFFFFF',
   gray: '#BDBDBD',
 };
+
+// profile control (STUDENT | TEACHER)
+const USER_PROFILE = 'STUDENT';
+
+// mocked feed posts
+const mockedFeedPosts = [
+  {
+    id: 'p1',
+    authorName: 'João Silva',
+    authorAvatar: 'https://i.pravatar.cc/100?img=3',
+    workoutTitle: 'Perna e Glúteo',
+    duration: '45 min',
+    timeAgo: 'Há 2 horas',
+    likes: 12,
+    exercises: [
+      { name: 'Agachamento', sets: 4, reps: '8-10', rest: '90s' },
+      { name: 'Leg Press', sets: 3, reps: '10-12', rest: '60s' },
+      { name: 'Passada', sets: 3, reps: '12-12', rest: '60s' },
+    ],
+  },
+  {
+    id: 'p2',
+    authorName: 'Mariana Costa',
+    authorAvatar: 'https://i.pravatar.cc/100?img=5',
+    workoutTitle: 'Treino de Força - Peito e Tríceps',
+    duration: '50 min',
+    timeAgo: 'Ontem',
+    likes: 34,
+    exercises: [
+      { name: 'Supino Reto', sets: 4, reps: '6-8', rest: '120s' },
+      { name: 'Supino Inclinado', sets: 3, reps: '8-10', rest: '90s' },
+      { name: 'Tríceps Pulley', sets: 3, reps: '10-12', rest: '60s' },
+    ],
+  },
+  {
+    id: 'p3',
+    authorName: 'Lucas Pereira',
+    authorAvatar: null,
+    workoutTitle: 'Cardio Intenso',
+    duration: '30 min',
+    timeAgo: '3 dias',
+    likes: 7,
+    exercises: [
+      { name: 'Corrida (esteira)', sets: 1, reps: '30 min', rest: '—' },
+      { name: 'Burpees', sets: 4, reps: '12', rest: '45s' },
+    ],
+  },
+];
 
 function Header() {
   const router = require('expo-router').useRouter();
@@ -57,8 +107,107 @@ function Header() {
   );
 }
 
+function PostCard({ item, onView }: { item: any; onView: () => void }) {
+  return (
+    <View style={styles.postCard}>
+      <View style={styles.postHeader}>
+        <View style={styles.postAuthorRow}>
+          {item.authorAvatar ? (
+            <Image source={{ uri: item.authorAvatar }} style={styles.postAvatar} />
+          ) : (
+            <View style={styles.postAvatarFallback}>
+              <FontAwesome name="user" size={16} color={colors.gray} />
+            </View>
+          )}
+          <Text style={styles.postAuthor}>{item.authorName}</Text>
+        </View>
+        <Text style={styles.postTime}>{item.timeAgo}</Text>
+      </View>
+
+      <View style={styles.postBody}>
+        <Text style={styles.postSmall}>Concluiu o treino:</Text>
+        <View style={styles.workoutRow}>
+          <MaterialIcons name="fitness-center" size={18} color={colors.red} />
+          <Text style={styles.workoutTitle}>{item.workoutTitle}</Text>
+        </View>
+        <Text style={styles.postDuration}>{item.duration}</Text>
+      </View>
+
+      <View style={styles.postFooter}>
+        <View style={styles.postFooterSeparator} />
+        <View style={styles.postActions}>
+          <TouchableOpacity style={styles.viewWorkout} onPress={onView}>
+            <Text style={styles.viewWorkoutText}>Visualizar treino</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function Content() {
-  return <View style={styles.content} />;
+  const [feedPosts] = useState(mockedFeedPosts);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<any | null>(null);
+  const router = require('expo-router').useRouter();
+
+  if (!feedPosts || feedPosts.length === 0) {
+    return (
+      <View style={styles.contentEmpty}>
+        {USER_PROFILE === 'STUDENT' ? (
+          <>
+            <Text style={styles.emptyTitle}>Seu feed está vazio. Siga outras pessoas para ver os treinos delas!</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => { /* TODO: navegar para add_friends.tsx */ router.push('/add_friends'); }}>
+              <Text style={styles.primaryButtonText}>Encontrar pessoas</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.emptyTitle}>Nenhuma atividade recente. Convide alunos para acompanhar a evolução deles!</Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={() => { /* TODO: navegar para tela de convites */ }}>
+              <Text style={styles.primaryButtonText}>Adicionar alunos</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.content}>
+      <FlatList
+        data={feedPosts}
+        keyExtractor={(i) => i.id}
+        renderItem={({ item }) => (
+          <PostCard
+            item={item}
+            onView={() => {
+              setSelectedPost(item);
+              setModalVisible(true);
+            }}
+          />
+        )}
+        contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
+        showsVerticalScrollIndicator={false}
+      />
+
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
+          <View style={styles.modalCard} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>{selectedPost?.workoutTitle}</Text>
+            <Text style={styles.modalMeta}>Por {selectedPost?.authorName} · {selectedPost?.duration}</Text>
+            <View style={{ height: 12 }} />
+            {selectedPost?.exercises?.map((ex: any, idx: number) => (
+              <View key={String(idx)} style={styles.exerciseRow}>
+                <Text style={styles.exerciseName}>{ex.name}</Text>
+                <Text style={styles.exerciseInfo}>{`${ex.sets}x${ex.reps} · ${ex.rest}`}</Text>
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </View>
+  );
 }
 
 function BottomNav() {
@@ -79,19 +228,15 @@ function BottomNav() {
       <TouchableOpacity
         style={styles.navItem}
         onPress={() => {
-          router.push('/routines_and_workouts');
+          if (USER_PROFILE === 'TEACHER') router.push('/clients');
+          else router.push('/routines_and_workouts');
         }}
       >
-        <MaterialIcons name="fitness-center" size={26} color={colors.gray} />
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.navItem}
-        onPress={() => {
-          router.push('/clients');
-        }}
-      >
-        <MaterialCommunityIcons name="account-group" size={24} color={colors.gray} />
+        {USER_PROFILE === 'TEACHER' ? (
+          <MaterialCommunityIcons name="account-group" size={24} color={colors.gray} />
+        ) : (
+          <MaterialIcons name="fitness-center" size={26} color={colors.gray} />
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -191,6 +336,60 @@ const styles = StyleSheet.create({
     marginTop: -12,
     // ensure content overlaps header slightly
   },
+
+  contentEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyTitle: {
+    color: colors.gray,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  primaryButton: {
+    backgroundColor: colors.red,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+  },
+  primaryButtonText: { color: colors.white, fontWeight: '700' },
+
+  postCard: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  postHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  postAuthorRow: { flexDirection: 'row', alignItems: 'center' },
+  postAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 8, backgroundColor: '#111' },
+  postAvatarFallback: { width: 36, height: 36, borderRadius: 18, marginRight: 8, backgroundColor: '#0B0B0B', alignItems: 'center', justifyContent: 'center' },
+  postAuthor: { color: colors.white, fontWeight: '700' },
+  postTime: { color: colors.gray, fontSize: 12 },
+
+  postBody: { marginTop: 10 },
+  postSmall: { color: colors.gray, marginBottom: 6 },
+  workoutRow: { flexDirection: 'row', alignItems: 'center' },
+  workoutTitle: { color: colors.white, fontWeight: '700', marginLeft: 8 },
+  postDuration: { color: colors.gray, marginTop: 6, fontSize: 12 },
+
+  postFooter: { marginTop: 12 },
+  postFooterSeparator: { height: StyleSheet.hairlineWidth, backgroundColor: '#0C0C0C', marginBottom: 8 },
+  postActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  likeRow: { flexDirection: 'row', alignItems: 'center' },
+  likeCount: { color: colors.gray, marginLeft: 6 },
+  viewWorkout: {},
+  viewWorkoutText: { color: colors.gray },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 20 },
+  modalCard: { backgroundColor: '#0A0A0A', padding: 18, borderRadius: 12, width: '100%' },
+  modalTitle: { color: colors.white, fontWeight: '700', fontSize: 18 },
+  modalMeta: { color: colors.gray, marginTop: 6 },
+  modalBody: { color: colors.gray, marginTop: 8 },
+  exerciseRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#070707' },
+  exerciseName: { color: colors.white },
+  exerciseInfo: { color: colors.gray, fontSize: 12 },
 
   bottomNav: {
     backgroundColor: colors.darkNav,
