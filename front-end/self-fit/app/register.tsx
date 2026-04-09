@@ -13,7 +13,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../src/components/ui/theme';
 
@@ -25,16 +24,129 @@ export default function Register(): JSX.Element {
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [login, setLogin] = useState<string>('');
+  const [dob, setDob] = useState<string>('');
+  const [dobError, setDobError] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [visible, setVisible] = useState<boolean>(false);
   const [isPro, setIsPro] = useState<boolean>(false);
   const [cref, setCref] = useState<string>('');
+  const [nameError, setNameError] = useState<string>('');
+  const [emailError, setEmailError] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
+  const [passwordError, setPasswordError] = useState<string>('');
+  const [crefError, setCrefError] = useState<string>('');
 
   useEffect(() => {
     const role = (params as any).role;
     if (role === 'TEACHER') setIsPro(true);
   }, [params]);
 
+  function validateDobFormat(dobStr: string) {
+    if (!dobStr || dobStr.trim() === '') return 'Data de nascimento é obrigatória.';
+    const re = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    const m = dobStr.match(re);
+    if (!m) return 'Formato inválido. Use DD/MM/AAAA.';
+    const day = Number(m[1]);
+    const month = Number(m[2]);
+    const year = Number(m[3]);
+    const d = new Date(year, month - 1, day);
+    if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return 'Data inválida.';
+    const now = new Date();
+    if (d > now) return 'Data de nascimento não pode ser no futuro.';
+    const age = now.getFullYear() - year - (now.getMonth() < (month - 1) || (now.getMonth() === (month - 1) && now.getDate() < day) ? 1 : 0);
+    if (age < 10) return 'Idade mínima: 10 anos.';
+    if (age > 120) return 'Idade inválida.';
+    return '';
+  }
+
+
+  function validateEmailFormat(e: string) {
+    if (!e || e.trim() === '') return 'E-mail é obrigatório.';
+    // simple email regex
+    // eslint-disable-next-line no-useless-escape
+    const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\\.,;:\s@\"]+\.)+[^<>()[\]\\.,;:\s@\"]{2,})$/i;
+    return re.test(e) ? '' : 'E-mail inválido.';
+  }
+
+  function validateAll() {
+    let ok = true;
+
+    const n = name.trim();
+    if (!n) {
+      setNameError('Nome obrigatório.');
+      ok = false;
+    } else if (n.length < 2) {
+      setNameError('Nome muito curto.');
+      ok = false;
+    } else setNameError('');
+
+    const em = validateEmailFormat(email.trim());
+    if (em) {
+      setEmailError(em);
+      ok = false;
+    } else setEmailError('');
+
+    const lg = login.trim();
+    if (!lg) {
+      setLoginError('Login obrigatório.');
+      ok = false;
+    } else if (lg.length < 3) {
+      setLoginError('Login muito curto.');
+      ok = false;
+    } else setLoginError('');
+
+    if (!password || password.length < 6) {
+      setPasswordError('Senha mínima de 6 caracteres.');
+      ok = false;
+    } else setPasswordError('');
+
+    if (isPro) {
+      if (!cref || cref.trim() === '') {
+        setCrefError('CREF obrigatório para professores.');
+        ok = false;
+      } else setCrefError('');
+    } else setCrefError('');
+
+    const dErr = validateDobFormat(dob);
+    if (dErr) {
+      setDobError(dErr);
+      ok = false;
+    } else setDobError('');
+
+    return ok;
+  }
+
+  function formatDobInput(input: string) {
+    // remove non-digits
+    const digits = input.replace(/\D/g, '').slice(0, 8); // DDMMYYYY
+    const parts = [];
+    if (digits.length >= 2) {
+      parts.push(digits.slice(0, 2));
+      if (digits.length >= 4) {
+        parts.push(digits.slice(2, 4));
+        if (digits.length > 4) parts.push(digits.slice(4));
+      } else if (digits.length > 2) {
+        parts.push(digits.slice(2));
+      }
+    } else if (digits.length > 0) {
+      parts.push(digits);
+    }
+    return parts.join('/');
+  }
+
+  function handleDobChange(text: string) {
+    const masked = formatDobInput(text);
+    setDob(masked);
+
+    // if full date, validate not future immediately
+    if (masked.length === 10) {
+      const err = validateDobFormat(masked);
+      if (err) setDobError(err);
+      else setDobError('');
+    } else {
+      setDobError('');
+    }
+  }
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -60,41 +172,57 @@ export default function Register(): JSX.Element {
             <Text style={styles.title}>REGISTRE-SE</Text>
 
             <View style={styles.inputWrapper}>
-              <View style={styles.inputRow}>
+              <View style={[styles.inputRow, { borderColor: nameError ? colors.red : 'transparent', borderWidth: nameError ? 1 : 0 }]}>
                 <Ionicons name="person" size={20} color="#333" style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Nome Completo"
                   placeholderTextColor="#666"
                   value={name}
-                  onChangeText={setName}
+                  onChangeText={(t) => { setName(t); if (nameError) setNameError(''); }}
                 />
               </View>
+              {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
 
-              <View style={[styles.inputRow, { marginTop: 12 }]}>
+              <View style={[styles.inputRow, { marginTop: 12, borderColor: emailError ? colors.red : 'transparent', borderWidth: emailError ? 1 : 0 }]}>
                 <Ionicons name="mail" size={20} color="#333" style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="E-mail"
                   placeholderTextColor="#666"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={(t) => { setEmail(t); if (emailError) setEmailError(''); }}
                   keyboardType="email-address"
                 />
               </View>
+              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-              <View style={[styles.inputRow, { marginTop: 12 }]}>
+              <View style={[styles.inputRow, { marginTop: 12, borderColor: dobError ? colors.red : 'transparent', borderWidth: dobError ? 1 : 0 }]}>
+                <Ionicons name="calendar" size={20} color="#333" style={styles.leftIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Data de Nascimento (DD/MM/AAAA)"
+                  placeholderTextColor="#666"
+                  value={dob}
+                  onChangeText={handleDobChange}
+                  keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
+                />
+              </View>
+              {dobError ? <Text style={styles.errorText}>{dobError}</Text> : null}
+
+              <View style={[styles.inputRow, { marginTop: 12, borderColor: loginError ? colors.red : 'transparent', borderWidth: loginError ? 1 : 0 }]}>
                 <Ionicons name="person" size={20} color="#333" style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Login"
                   placeholderTextColor="#666"
                   value={login}
-                  onChangeText={setLogin}
+                  onChangeText={(t) => { setLogin(t); if (loginError) setLoginError(''); }}
                 />
               </View>
+              {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
 
-              <View style={[styles.inputRow, { marginTop: 12 }]}>
+              <View style={[styles.inputRow, { marginTop: 12, borderColor: passwordError ? colors.red : 'transparent', borderWidth: passwordError ? 1 : 0 }]}>
                 <MaterialIcons name="lock-outline" size={20} color="#333" style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
@@ -102,7 +230,7 @@ export default function Register(): JSX.Element {
                   placeholderTextColor="#666"
                   secureTextEntry={!visible}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(t) => { setPassword(t); if (passwordError) setPasswordError(''); }}
                 />
                 <TouchableOpacity
                   onPress={() => setVisible((v) => !v)}
@@ -112,6 +240,7 @@ export default function Register(): JSX.Element {
                   <Ionicons name={visible ? 'eye' : 'eye-off'} size={20} color="#333" />
                 </TouchableOpacity>
               </View>
+              {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
 
               <View style={[styles.checkboxRow, { marginTop: 12 }]}>
                 <TouchableOpacity
@@ -128,17 +257,18 @@ export default function Register(): JSX.Element {
               </View>
 
               {isPro && (
-                <View style={[styles.inputRow, { marginTop: 12 }]}>
+                <View style={[styles.inputRow, { marginTop: 12, borderColor: crefError ? colors.red : 'transparent', borderWidth: crefError ? 1 : 0 }]}>
                   <MaterialIcons name="badge" size={20} color="#333" style={styles.leftIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="CREF"
                     placeholderTextColor="#666"
                     value={cref}
-                    onChangeText={setCref}
+                    onChangeText={(t) => { setCref(t); if (crefError) setCrefError(''); }}
                   />
                 </View>
               )}
+              {crefError ? <Text style={styles.errorText}>{crefError}</Text> : null}
             </View>
 
             <TouchableOpacity
@@ -146,22 +276,14 @@ export default function Register(): JSX.Element {
               activeOpacity={0.85}
               accessibilityRole="button"
               onPress={() => {
+                // validate all fields before submitting
+                const ok = validateAll();
+                if (!ok) return;
                 // TODO: Integrar API de registro (envio de dados e role)
                 router.replace('/home');
               }}
             >
               <Text style={styles.buttonText}>Entrar</Text>
-            </TouchableOpacity>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ou</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity style={styles.googleButton} activeOpacity={0.85} accessibilityRole="button">
-              <Image source={require('../assets/images/logo_google.png')} style={styles.googleIcon} />
-              <Text style={styles.googleButtonText}>Entrar com o Google</Text>
             </TouchableOpacity>
             </View>
           </ScrollView>
@@ -328,6 +450,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     fontFamily: 'Anton',
+  },
+
+  errorText: {
+    color: colors.red,
+    marginTop: 6,
+    alignSelf: 'flex-start',
   },
 
   scroll: {
