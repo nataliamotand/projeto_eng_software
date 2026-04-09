@@ -82,7 +82,7 @@ function Header() {
         <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/add_friends'); }}>
           <FontAwesome name="user-plus" size={20} color={colors.white} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.iconTouch} onPress={() => { /* TODO: notificações */ }}>
+        <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/notifications'); }}>
           <Ionicons name="notifications-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>

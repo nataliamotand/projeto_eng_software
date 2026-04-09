@@ -95,7 +95,7 @@ export default function ClientDetails(): JSX.Element {
             <Text style={styles.secondaryText}>Visualizar métricas</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={() => { /* TODO: ver pendências */ }}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={() => { router.push('/notifications'); }}>
             <View style={styles.secondaryLeft}>
               <Ionicons name="notifications-outline" size={20} color={colors.white} />
               <View style={styles.pendingDot} />

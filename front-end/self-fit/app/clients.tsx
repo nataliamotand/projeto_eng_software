@@ -72,7 +72,7 @@ function Header() {
       </View>
 
       <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.iconTouch} onPress={() => { /* TODO: abrir notificações */ }}>
+        <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/notifications'); }}>
           <Ionicons name="notifications-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
