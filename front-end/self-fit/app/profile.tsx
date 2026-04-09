@@ -12,19 +12,12 @@ import {
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Header from '../src/components/ui/Header';
+import Footer from '../src/components/ui/Footer';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkRed: '#B30000',
-  darkGray: '#1A1A1A',
-  cardBg: '#121212',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-  lightGray: '#9B9B9B',
-};
 
 // MOCKED DATA
 const USER = {
@@ -89,14 +82,15 @@ export default function Profile(): JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <Header title="Perfil" />
+
       <View style={styles.settingsWrap}>
         <TouchableOpacity onPress={() => { router.push('/edit_profile'); }} style={styles.iconTouch}>
           <Ionicons name="settings-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
-      
 
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200, flexGrow: 1 }}>
         <View style={styles.profileCard}>
           <Image source={USER.avatar} style={styles.avatarLarge} />
           <View style={styles.statsWrap}>
@@ -170,24 +164,7 @@ export default function Profile(): JSX.Element {
         </View>
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => { router.push('/home'); }}>
-          <FontAwesome name="home" size={24} color={colors.grayText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => { router.push('/routines_and_workouts'); }}>
-          <MaterialIcons name="fitness-center" size={26} color={colors.grayText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => { router.push('/clients'); }}>
-          <MaterialCommunityIcons name="account-group" size={24} color={colors.grayText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => { /* already on profile */ }}>
-          <FontAwesome name="user" size={24} color={colors.red} />
-          <View style={styles.activeIndicator} />
-        </TouchableOpacity>
-      </View>
+      <StickyFooter active="profile" />
     </SafeAreaView>
   );
 }
@@ -277,4 +254,14 @@ const styles = StyleSheet.create({
   },
   navItem: { alignItems: 'center', justifyContent: 'center', width: 72, height: 64 },
   activeIndicator: { marginTop: 6, width: 28, height: 3, backgroundColor: colors.red, borderRadius: 2 },
+  footerWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    backgroundColor: colors.darkGray,
+    paddingTop: 6,
+    paddingBottom: 6,
+  },
 });

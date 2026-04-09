@@ -2,16 +2,10 @@ import React from 'react';
 import { SafeAreaView, View, Text, StyleSheet, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { width, height } = Dimensions.get('window');
 
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkGray: '#1A1A1A',
-  white: '#FFFFFF',
-  lightGray: '#CFCFCF',
-};
 
 export default function Welcome(): JSX.Element {
   const router = useRouter();
@@ -107,7 +101,7 @@ const styles = StyleSheet.create({
   },
   bottom: {
     paddingHorizontal: 20,
-    paddingBottom: Math.max(32, height * 0.05),
+    paddingBottom: Math.max(32, height * 0.1),
   },
   primaryButton: {
     backgroundColor: colors.red,

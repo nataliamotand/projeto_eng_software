@@ -15,18 +15,9 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  white: '#FFFFFF',
-  grayLight: '#CFCFCF',
-  grayMid: '#9A9A9A',
-  cardBg: '#0A0A0A',
-  inputBg: '#1A1A1A',
-};
 
 const USER_PROFILE = 'STUDENT';
 

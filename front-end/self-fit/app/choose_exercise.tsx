@@ -17,19 +17,9 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useExercises } from '../src/hooks/useExercises';
 import { muscleOptions, displayMuscleLabel } from '../src/constants/muscles';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-	background: '#000000',
-	red: '#CC0000',
-	darkNav: '#1A1A1A',
-	white: '#FFFFFF',
-	grayLight: '#BDBDBD',
-	grayMid: '#AFAFAF',
-};
-
-// imported shared muscle options and label helper
 
 type Exercise = {
 	id?: string | number;

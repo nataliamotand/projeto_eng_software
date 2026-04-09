@@ -12,17 +12,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { useRouter } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  white: '#FFFFFF',
-  grayLight: '#CFCFCF',
-  grayMid: '#9A9A9A',
-  inputBg: '#1A1A1A',
-};
 
 export default function Measures(): JSX.Element {
   const router = useRouter();

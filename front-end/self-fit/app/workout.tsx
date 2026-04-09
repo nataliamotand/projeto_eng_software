@@ -16,19 +16,9 @@ import {
 import ImageRotator from '../src/components/ui/image-rotator';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  white: '#FFFFFF',
-  grayLight: '#CFCFCF',
-  grayMid: '#9A9A9A',
-  cardBg: '#0A0A0A',
-  rowDone: '#133A13',
-  rowPending: '#111',
-};
 
 const muscleMap: Record<string, string> = {
   "upper back": "Costas (parte de cima)",

@@ -11,15 +11,10 @@ import {
 import { Calendar } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkGray: '#1A1A1A',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-};
 
 // MOCKED WORKOUTS (some dates in 2026)
 const mockedWorkouts = [
@@ -285,24 +280,7 @@ export default function CalendarScreen(): JSX.Element {
         {viewMode === 'multi-year' && <MultiYearView workoutsMap={workoutsMap} />}
       </ScrollView>
 
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/home')}>
-          <FontAwesome name="home" size={24} color={colors.grayText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/routines_and_workouts')}>
-          <MaterialIcons name="fitness-center" size={26} color={colors.grayText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/clients')}>
-          <MaterialCommunityIcons name="account-group" size={24} color={colors.grayText} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-          <FontAwesome name="user" size={24} color={colors.red} />
-          <View style={styles.activeIndicator} />
-        </TouchableOpacity>
-      </View>
+      <StickyFooter active="workouts" />
     </SafeAreaView>
   );
 }

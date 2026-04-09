@@ -10,18 +10,13 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Header from '../src/components/ui/Header';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors as themeColors } from '../src/components/ui/theme';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
+import { colors } from '../src/components/ui/theme';
 
 const { width, height } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkGray: '#1A1A1A',
-  white: '#FFFFFF',
-  lightGray: '#CFCFCF',
-  gold: '#D4AF37',
-};
 
 // Function to generate mocked data optionally based on studentId
 function generateMocks(studentId?: string | number) {
@@ -88,17 +83,7 @@ export default function Metrics(): JSX.Element {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Métricas de Treino</Text>
-
-        <TouchableOpacity onPress={() => { /* TODO: share/export */ }} style={styles.headerRight}>
-          <Ionicons name="share-outline" size={22} color={colors.white} />
-        </TouchableOpacity>
-      </View>
+      <Header title="Métricas de Treino" right={<TouchableOpacity onPress={() => {}}><Ionicons name="share-outline" size={22} color={themeColors.white} /></TouchableOpacity>} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Consistência */}
@@ -186,6 +171,7 @@ export default function Metrics(): JSX.Element {
         <View style={styles.footerNote}>
           <Text style={styles.footerText}>© Self-fit</Text>
         </View>
+        <StickyFooter showNav={false} />
       </ScrollView>
     </SafeAreaView>
   );

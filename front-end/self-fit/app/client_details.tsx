@@ -11,19 +11,11 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Header from '../src/components/ui/Header';
+import Footer from '../src/components/ui/Footer';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkRed: '#B30000',
-  darkGray: '#1A1A1A',
-  cardBg: '#121212',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-  lightGray: '#9A9A9A',
-};
 
 // MOCKED DATA
 const clientData = {
@@ -42,17 +34,7 @@ export default function ClientDetails(): JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => { router.back(); }} style={styles.headerIconLeft}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Detalhes do Aluno</Text>
-
-        <TouchableOpacity onPress={() => { /* TODO: abrir menu de ações */ }} style={styles.headerIconRight}>
-          <MaterialIcons name="more-vert" size={24} color={colors.white} />
-        </TouchableOpacity>
-      </View>
+      <Header title="Detalhes do Aluno" />
 
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         <View style={styles.profileCard}>
@@ -67,6 +49,7 @@ export default function ClientDetails(): JSX.Element {
               <Text style={styles.objectiveText}>Objetivo: {clientData.objective}</Text>
             </View>
           </View>
+
         </View>
 
         <View style={styles.ctaWrap}>

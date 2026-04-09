@@ -14,21 +14,10 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkRed: '#B30000',
-  darkNav: '#1A1A1A',
-  darkGray: '#1A1A1A',
-  cardBg: '#1A1A1A',
-  startGray: '#6B7280',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-  placeholder: '#9A9A9A',
-};
 
 const mockedClients = [
   {
@@ -269,7 +258,7 @@ export default function Clients(): JSX.Element {
         </View>
       </View>
 
-      <BottomNav />
+      <StickyFooter active="clients" />
     </SafeAreaView>
   );
 }

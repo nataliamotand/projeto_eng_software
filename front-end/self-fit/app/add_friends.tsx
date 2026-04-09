@@ -12,16 +12,9 @@ import {
 } from 'react-native';
 import { Ionicons, FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  darkGray: '#1A1A1A',
-  red: '#CC0000',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-};
 
 const mockedUsers = [
   { id: '1', name: 'Mariana Silva', username: 'maris', subtitle: '3 em comum', avatar: require('../assets/images/logo.png') },

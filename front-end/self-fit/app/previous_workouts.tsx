@@ -11,16 +11,11 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Modal } from 'react-native';
+import Header from '../src/components/ui/Header';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkGray: '#1A1A1A',
-  white: '#FFFFFF',
-  lightGray: '#CFCFCF',
-};
 
 type Workout = {
   id: string;
@@ -138,13 +133,7 @@ export default function PreviousWorkouts(): JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
-          <Ionicons name="arrow-back" size={24} color={colors.white} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Treinos Anteriores</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <Header title="Treinos Anteriores" />
 
       <FlatList
         data={sorted}
@@ -217,6 +206,8 @@ export default function PreviousWorkouts(): JSX.Element {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <StickyFooter active="workouts" />
     </SafeAreaView>
   );
 }

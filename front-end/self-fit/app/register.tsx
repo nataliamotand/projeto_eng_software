@@ -15,17 +15,9 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { height, width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  redBright: '#FF0000',
-  inputBg: '#E5E5E5',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-};
 
 export default function Register(): JSX.Element {
   const router = useRouter();

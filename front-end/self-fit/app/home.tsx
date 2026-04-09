@@ -13,19 +13,10 @@ import {
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import Welcome from './welcome';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  redBright: '#FF0000',
-  darkNav: '#1A1A1A',
-  lightRed: '#E54F4F',
-  white: '#FFFFFF',
-  gray: '#BDBDBD',
-};
 
 // profile control (STUDENT | TEACHER)
 const USER_PROFILE = 'STUDENT';
@@ -234,7 +225,7 @@ export default function Home(): JSX.Element {
     <SafeAreaView style={styles.safeArea}>
       <Header />
       <Content />
-      <BottomNav />
+      <StickyFooter active="home" />
     </SafeAreaView>
   );
 }

@@ -15,21 +15,10 @@ import {
 import { FontAwesome, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import StickyFooter from '../src/components/ui/StickyFooter';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkRed: '#B30000',
-  lightRed: '#E54F4F',
-  darkNav: '#1A1A1A',
-  cardBg: '#1F1F1F',
-  inputBg: '#E5E5E5',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-  startGray: '#6B7280',
-};
 
 // TODO: Implementar lógica para obter o perfil real do usuário (STUDENT/TEACHER)
 const USER_PROFILE = 'STUDENT'; // focus implementation on STUDENT layout
@@ -303,7 +292,7 @@ export default function RoutinesAndWorkouts(): JSX.Element {
         </View>
       </View>
 
-      <BottomNav />
+      <StickyFooter active="workouts" />
     </SafeAreaView>
   );
 }

@@ -11,16 +11,9 @@ import {
 } from 'react-native';
 import { FontAwesome, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
-const colors = {
-  background: '#000000',
-  red: '#CC0000',
-  darkGray: '#1A1A1A',
-  white: '#FFFFFF',
-  grayText: '#CFCFCF',
-  lightGray: '#8F8F8F',
-};
 
 export enum NotificationType {
   FOLLOW_REQUEST = 'FOLLOW_REQUEST',
