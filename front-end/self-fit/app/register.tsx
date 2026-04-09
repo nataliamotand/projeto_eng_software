@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 const { height, width } = Dimensions.get('window');
 
@@ -29,6 +29,7 @@ const colors = {
 
 export default function Register(): JSX.Element {
   const router = useRouter();
+  const params = useLocalSearchParams ? useLocalSearchParams() : {};
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
   const [login, setLogin] = useState<string>('');
@@ -36,6 +37,11 @@ export default function Register(): JSX.Element {
   const [visible, setVisible] = useState<boolean>(false);
   const [isPro, setIsPro] = useState<boolean>(false);
   const [cref, setCref] = useState<string>('');
+
+  useEffect(() => {
+    const role = (params as any).role;
+    if (role === 'TEACHER') setIsPro(true);
+  }, [params]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -143,7 +149,15 @@ export default function Register(): JSX.Element {
               )}
             </View>
 
-            <TouchableOpacity style={styles.button} activeOpacity={0.85} accessibilityRole="button">
+            <TouchableOpacity
+              style={styles.button}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              onPress={() => {
+                // TODO: Integrar API de registro (envio de dados e role)
+                router.replace('/home');
+              }}
+            >
               <Text style={styles.buttonText}>Entrar</Text>
             </TouchableOpacity>
 

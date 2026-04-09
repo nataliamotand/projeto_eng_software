@@ -30,6 +30,7 @@ export default function Login(): JSX.Element {
   const [login, setLogin] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [visible, setVisible] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -90,9 +91,24 @@ export default function Login(): JSX.Element {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.button} activeOpacity={0.85} accessibilityRole="button">
+            <TouchableOpacity
+              style={styles.button}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              onPress={() => {
+                // mocked credentials: login 'gabi' and password '123'
+                if (login === 'gabi' && password === '123') {
+                  setError(null);
+                  router.replace('/home');
+                } else {
+                  setError('Login ou senha inválidos (use gabi / 123)');
+                }
+              }}
+            >
               <Text style={styles.buttonText}>Entrar</Text>
             </TouchableOpacity>
+
+            {error ? <Text style={{ color: '#FF6666', marginTop: 8 }}>{error}</Text> : null}
 
             <TouchableOpacity style={styles.linkTouch} accessibilityRole="link">
               <Text style={styles.linkText}>Esqueceu sua senha?</Text>

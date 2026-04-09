@@ -13,6 +13,7 @@ import {
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { FontAwesome } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import Welcome from './welcome';
 
 const { width } = Dimensions.get('window');
 
@@ -146,64 +147,41 @@ function PostCard({ item, onView }: { item: any; onView: () => void }) {
 }
 
 function Content() {
-  const [feedPosts] = useState(mockedFeedPosts);
-  const [modalVisible, setModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<any | null>(null);
-  const router = require('expo-router').useRouter();
+  const [modalVisible, setModalVisible] = useState(false);
 
-  if (!feedPosts || feedPosts.length === 0) {
-    return (
-      <View style={styles.contentEmpty}>
-        {USER_PROFILE === 'STUDENT' ? (
-          <>
-            <Text style={styles.emptyTitle}>Seu feed está vazio. Siga outras pessoas para ver os treinos delas!</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => { /* TODO: navegar para add_friends.tsx */ router.push('/add_friends'); }}>
-              <Text style={styles.primaryButtonText}>Encontrar pessoas</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <Text style={styles.emptyTitle}>Nenhuma atividade recente. Convide alunos para acompanhar a evolução deles!</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => { /* TODO: navegar para tela de convites */ }}>
-              <Text style={styles.primaryButtonText}>Adicionar alunos</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    );
+  function onView(post: any) {
+    setSelectedPost(post);
+    setModalVisible(true);
   }
 
   return (
     <View style={styles.content}>
       <FlatList
-        data={feedPosts}
-        keyExtractor={(i) => i.id}
-        renderItem={({ item }) => (
-          <PostCard
-            item={item}
-            onView={() => {
-              setSelectedPost(item);
-              setModalVisible(true);
-            }}
-          />
-        )}
-        contentContainerStyle={{ padding: 16, paddingBottom: 140 }}
-        showsVerticalScrollIndicator={false}
+        data={mockedFeedPosts}
+        keyExtractor={(p) => p.id}
+        renderItem={({ item }) => <PostCard item={item} onView={() => onView(item)} />}
+        contentContainerStyle={{ padding: 16 }}
       />
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
-          <View style={styles.modalCard} onStartShouldSetResponder={() => true}>
-            <Text style={styles.modalTitle}>{selectedPost?.workoutTitle}</Text>
-            <Text style={styles.modalMeta}>Por {selectedPost?.authorName} · {selectedPost?.duration}</Text>
-            <View style={{ height: 12 }} />
-            {selectedPost?.exercises?.map((ex: any, idx: number) => (
-              <View key={String(idx)} style={styles.exerciseRow}>
-                <Text style={styles.exerciseName}>{ex.name}</Text>
-                <Text style={styles.exerciseInfo}>{`${ex.sets}x${ex.reps} · ${ex.rest}`}</Text>
-              </View>
-            ))}
-          </View>
+          <TouchableOpacity activeOpacity={1} style={styles.modalCard}>
+            {selectedPost && (
+              <>
+                <Text style={styles.modalTitle}>{selectedPost.workoutTitle}</Text>
+                <Text style={styles.modalMeta}>{selectedPost.authorName} • {selectedPost.duration}</Text>
+                <View style={{ marginTop: 12 }}>
+                  {selectedPost.exercises.map((ex: any, idx: number) => (
+                    <View key={idx} style={styles.exerciseRow}>
+                      <Text style={styles.exerciseName}>{ex.name}</Text>
+                      <Text style={styles.exerciseInfo}>{ex.sets}x {ex.reps}</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </View>
