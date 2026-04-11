@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from datetime import date
 from typing import List, Optional
 
-# --- ESQUEMAS DE USUÁRIO (Criação de Conta) ---
+# --- USUÁRIOS ---
 class UsuarioCreate(BaseModel):
     nome: str
     email: str
@@ -15,17 +15,34 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     tipo_perfil: str
-
     class Config:
         from_attributes = True
 
-# --- ESQUEMAS DE PERFIS (Completar o Perfil) ---
+# --- PERFIS ---
 class ProfessorCreate(BaseModel):
     cref: str
 
 class AlunoCreate(BaseModel):
-    peso: float
-    altura: float
     objetivo: str
 
-# (E aqui embaixo continua com aqueles esquemas de Exercicio e FichaTreino que te mandei antes...)
+# --- EVOLUÇÃO (O "Array" da Gabi) ---
+class EvolucaoCreate(BaseModel):
+    peso: float
+    porcentagem_gordura: Optional[float] = None
+    massa_muscular: Optional[float] = None
+
+class EvolucaoResponse(BaseModel):
+    id: int
+    data_registro: date
+    peso: float
+    porcentagem_gordura: Optional[float]
+    massa_muscular: Optional[float]
+    class Config:
+        from_attributes = True
+
+class AlunoResponse(BaseModel):
+    id: int
+    objetivo: str
+    historico_evolucao: List[EvolucaoResponse] = []
+    class Config:
+        from_attributes = True
