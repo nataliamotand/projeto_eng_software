@@ -9,10 +9,7 @@ import models
 import schemas
 import auth
 
-# Apaga as tabelas antigas (CUIDADO: SÓ USE EM DESENVOLVIMENTO)
-#models.Base.metadata.drop_all(bind=engine)
-
-# Cria as tabelas novas com as colunas atualizadas
+# Cria as tabelas no banco de dados Neon
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API Self-Fit", description="Sistema de gerenciamento de treinos")
@@ -37,15 +34,14 @@ def get_db():
 
 @app.post("/usuarios", response_model=schemas.UsuarioResponse, summary="Cadastrar um novo usuário")
 def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
-    # 1. Verifica se o email já existe
+    # Verifica se o email já existe
     email_existe = db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first()
     if email_existe:
         raise HTTPException(status_code=400, detail="Email já cadastrado.")
 
-    # 2. Criptografa a senha ANTES de salvar
+    # Criptografa a senha e salva
     senha_criptografada = auth.gerar_hash_senha(usuario.senha)
-
-    # 3. Salva no banco
+    
     db_usuario = models.Usuario(
         nome=usuario.nome,
         email=usuario.email,
@@ -60,10 +56,8 @@ def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_
 
 @app.post("/login", summary="Fazer login e pegar o Token JWT")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # O OAuth2 usa 'username' por padrão, mas para nós, username = email
     usuario = db.query(models.Usuario).filter(models.Usuario.email == form_data.username).first()
 
-    # Se não achar o usuário ou a senha estiver errada
     if not usuario or not auth.verificar_senha(form_data.password, usuario.senha):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -71,8 +65,78 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Se deu tudo certo, cria o crachá com o email e o tipo de perfil
+    # Cria o token
     token = auth.criar_token_acesso(dados={"sub": usuario.email, "perfil": usuario.tipo_perfil})
     return {"access_token": token, "token_type": "bearer"}
 
-# (Rotas de Alunos, Professores e Exercícios entrarão aqui nas próximas etapas)
+@app.get("/perfil", summary="Área VIP: Ver meu próprio perfil")
+def ler_perfil_logado(email_usuario: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email_usuario).first()
+    return {
+        "mensagem": "Você está na Área VIP!",
+        "dados": {
+            "nome": usuario.nome,
+            "email": usuario.email,
+            "perfil": usuario.tipo_perfil
+        }
+    }
+
+
+# --- ROTAS DE COMPLEMENTO DE PERFIL ---
+
+@app.post("/professores", summary="Completar perfil de Professor")
+def criar_perfil_professor(perfil: schemas.ProfessorCreate, email_usuario: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email_usuario).first()
+    
+    if usuario.tipo_perfil != "TEACHER":
+        raise HTTPException(status_code=403, detail="Apenas professores podem criar este perfil.")
+    
+    if usuario.perfil_professor:
+        raise HTTPException(status_code=400, detail="Você já possui um perfil de professor ativo.")
+
+    db_professor = models.Professor(usuario_id=usuario.id, cref=perfil.cref)
+    db.add(db_professor)
+    db.commit()
+    db.refresh(db_professor)
+    return db_professor
+
+@app.post("/alunos", summary="Completar perfil de Aluno")
+def criar_perfil_aluno(perfil: schemas.AlunoCreate, email_usuario: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email_usuario).first()
+    
+    if usuario.tipo_perfil != "STUDENT":
+        raise HTTPException(status_code=403, detail="Apenas alunos podem criar este perfil.")
+        
+    if usuario.perfil_aluno:
+        raise HTTPException(status_code=400, detail="Você já possui um perfil de aluno ativo.")
+
+    db_aluno = models.Aluno(
+        usuario_id=usuario.id,
+        peso=perfil.peso,
+        altura=perfil.altura,
+        objetivo=perfil.objetivo
+    )
+    db.add(db_aluno)
+    db.commit()
+    db.refresh(db_aluno)
+    return db_aluno
+
+
+# --- A ROTA DO VÍNCULO MÁGICO ---
+
+@app.put("/alunos/vincular-professor/{professor_id}", summary="Vincular Aluno logado a um Professor")
+def vincular_professor(professor_id: int, email_usuario: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email_usuario).first()
+    aluno = usuario.perfil_aluno
+
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Complete seu perfil de corpo (peso/altura) primeiro.")
+
+    professor = db.query(models.Professor).filter(models.Professor.id == professor_id).first()
+    if not professor:
+        raise HTTPException(status_code=404, detail="O ID desse Professor não existe.")
+
+    aluno.professor_id = professor.id
+    db.commit()
+    
+    return {"mensagem": f"Sucesso! Você agora é aluno do professor {professor.usuario.nome}."}
