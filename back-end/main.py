@@ -20,11 +20,25 @@ def get_db():
 
 @app.post("/usuarios", response_model=schemas.UsuarioResponse)
 def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
+    # 1. Verifica se o email já existe
     if db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first():
         raise HTTPException(status_code=400, detail="Email já cadastrado.")
+    
+    # 2. Prepara o objeto (criptografando a senha)
     senha_hash = auth.gerar_hash_senha(usuario.senha)
-    db_usuario = models.Usuario(**usuario.dict(exclude={'senha'}), senha=senha_hash)
-    db.add(db_usuario); db.commit(); db.refresh(db_usuario)
+    db_usuario = models.Usuario(
+        nome=usuario.nome,
+        email=usuario.email,
+        senha=senha_hash,
+        data_nascimento=usuario.data_nascimento,
+        tipo_perfil=usuario.tipo_perfil
+    )
+    
+    # 3. Salva no Neon
+    db.add(db_usuario)
+    db.commit()      # Envia para o banco
+    db.refresh(db_usuario)  # Puxa os dados atualizados (como o ID gerado)
+    
     return db_usuario
 
 @app.post("/login")
@@ -85,3 +99,44 @@ def vincular(professor_id: int, email: str = Depends(auth.obter_usuario_atual), 
     p = db.query(models.Professor).filter(models.Professor.id == professor_id).first()
     u.perfil_aluno.professor_id = p.id
     db.commit(); return {"mensagem": "Vinculado!"}
+
+# No main.py
+
+@app.post("/fichas", response_model=schemas.FichaTreinoResponse, summary="Professor cria uma ficha para o Aluno")
+def criar_ficha(ficha_dados: schemas.FichaTreinoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    # 1. Verificar se quem está logado é um Professor
+    u_professor = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u_professor.perfil_professor:
+        raise HTTPException(status_code=403, detail="Apenas professores podem criar fichas.")
+
+    # 2. Criar a cabeça da ficha
+    nova_ficha = models.FichaTreino(
+        aluno_id=ficha_dados.aluno_id,
+        titulo=ficha_dados.titulo
+    )
+    db.add(nova_ficha)
+    db.flush() # Flush gera o ID da ficha sem fechar a transação
+
+    # 3. Adicionar os exercícios usando os IDs do JSON da Gabi
+    for ex in ficha_dados.exercicios:
+        item = models.ItemExercicio(
+            ficha_id=nova_ficha.id,
+            exercicio_referencia_id=ex.exercicio_referencia_id,
+            series=ex.series,
+            repeticoes=ex.repeticoes,
+            carga=ex.carga,
+            observacao=ex.observacao
+        )
+        db.add(item)
+    
+    db.commit()
+    db.refresh(nova_ficha)
+    return nova_ficha
+
+@app.get("/alunos/minhas-fichas", response_model=List[schemas.FichaTreinoResponse])
+def ver_minhas_fichas(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u.perfil_aluno:
+        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
+    
+    return u.perfil_aluno.fichas

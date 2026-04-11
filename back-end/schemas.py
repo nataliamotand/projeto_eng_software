@@ -15,8 +15,9 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     tipo_perfil: str
+
     class Config:
-        from_attributes = True
+        from_attributes = True # ESSA LINHA É OBRIGATÓRIA
 
 # --- PERFIS ---
 class ProfessorCreate(BaseModel):
@@ -46,3 +47,32 @@ class AlunoResponse(BaseModel):
     historico_evolucao: List[EvolucaoResponse] = []
     class Config:
         from_attributes = True
+
+
+class ItemExercicioCreate(BaseModel):
+    exercicio_referencia_id: int
+    series: int
+    repeticoes: int
+    carga: float
+    observacao: Optional[str] = None
+
+class FichaTreinoCreate(BaseModel):
+    aluno_id: int
+    titulo: str
+    exercicios: List[ItemExercicioCreate] # Uma lista de exercícios já na criação
+
+class ItemExercicioResponse(BaseModel):
+    id: int
+    exercicio_referencia_id: int
+    series: int
+    repeticoes: int
+    carga: float
+    observacao: Optional[str]
+    class Config: from_attributes = True
+
+class FichaTreinoResponse(BaseModel):
+    id: int
+    titulo: str
+    status: str
+    exercicios: List[ItemExercicioResponse]
+    class Config: from_attributes = True
