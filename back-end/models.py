@@ -2,27 +2,48 @@ from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date
 from sqlalchemy.orm import relationship
 from database import Base
 
+# --- MODELOS DE USUÁRIOS E PERFIS ---
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, nullable=False)
-    email = Column(String, unique=True, index=True, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False) # O email será o "Login"
     senha = Column(String, nullable=False)
-    tipo_perfil = Column(String, nullable=False) # 'aluno' ou 'professor'
+    data_nascimento = Column(Date, nullable=False)
+    tipo_perfil = Column(String, nullable=False) # 'STUDENT' ou 'TEACHER'
+
+    # Ligações bi-direcionais para o Python achar os dados fácil
+    perfil_aluno = relationship("Aluno", back_populates="usuario", uselist=False)
+    perfil_professor = relationship("Professor", back_populates="usuario", uselist=False)
+
+class Professor(Base):
+    __tablename__ = "professores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True) # Herança do Usuário
+    cref = Column(String, unique=True, nullable=False)
+
+    usuario = relationship("Usuario", back_populates="perfil_professor")
+    alunos = relationship("Aluno", back_populates="professor") # Um professor tem vários alunos
 
 class Aluno(Base):
     __tablename__ = "alunos"
 
     id = Column(Integer, primary_key=True, index=True)
-    # A Chave Estrangeira que liga o Aluno ao seu perfil de Usuário
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True) 
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True) # Herança do Usuário
+    professor_id = Column(Integer, ForeignKey("professores.id"), nullable=True) # Vínculo com o Professor (pode começar sem)
     peso = Column(Float)
     altura = Column(Float)
     objetivo = Column(String)
 
-    # Relacionamentos para facilitar as buscas no Python
+    usuario = relationship("Usuario", back_populates="perfil_aluno")
+    professor = relationship("Professor", back_populates="alunos")
     fichas = relationship("FichaTreino", back_populates="aluno")
+
+
+# --- MODELOS DE TREINOS ---
 
 class FichaTreino(Base):
     __tablename__ = "fichas_treino"
