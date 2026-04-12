@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   Image,
@@ -10,20 +9,67 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Importação atualizada para remover o aviso amarelo
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../src/components/ui/theme';
 
-const { height, width } = Dimensions.get('window');
+// Importando o nosso configurador do Axios
+import api from '../src/services/api';
 
+const { height, width } = Dimensions.get('window');
 
 export default function Login(): JSX.Element {
   const router = useRouter();
-  const [login, setLogin] = useState<string>('');
+  
+  // Estados do formulário
+  const [login, setLogin] = useState<string>(''); 
   const [password, setPassword] = useState<string>('');
   const [visible, setVisible] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  // Função que dispara o Login
+  const handleLogin = async () => {
+    if (!login || !password) {
+      setError('Por favor, preencha email e senha.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // O FastAPI com OAuth2 exige formato URLSearchParams
+      const params = new URLSearchParams();
+      params.append('username', login);
+      params.append('password', password);
+
+      const response = await api.post('/login', params.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
+
+      const token = response.data.access_token;
+      console.log('Login realizado com sucesso! Token recebido:', token);
+      
+      // Deu certo? Vai para a Home!
+      router.push('/home');
+
+    } catch (err: any) {
+      if (err.response && err.response.status === 401) {
+        setError('Email ou senha incorretos.');
+      } else {
+        setError('Erro ao conectar com o servidor. Verifique se a API está rodando.');
+        console.error("Erro detalhado:", err);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -42,8 +88,12 @@ export default function Login(): JSX.Element {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.top}>
-            <Image source={require('../assets/images/logo.png')} style={styles.logoImage} resizeMode="contain" />
+          <View style={styles.header}>
+            <Image
+              source={require('../assets/images/logo.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.center}>
@@ -51,61 +101,69 @@ export default function Login(): JSX.Element {
 
             <View style={styles.inputWrapper}>
               <View style={styles.inputRow}>
-                <Ionicons name="person" size={20} color="#333" style={styles.leftIcon} />
+                <Ionicons name="mail" size={20} color={colors.grayText} style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Login"
-                  placeholderTextColor="#666"
+                  placeholder="Email"
+                  placeholderTextColor={colors.grayText}
                   value={login}
                   onChangeText={setLogin}
-                  keyboardType="default"
-                  returnKeyType="next"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!loading}
                 />
               </View>
 
               <View style={[styles.inputRow, { marginTop: 16 }]}>
-                <MaterialIcons name="lock-outline" size={20} color="#333" style={styles.leftIcon} />
+                <Ionicons name="lock-closed" size={20} color={colors.grayText} style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="Senha"
-                  placeholderTextColor="#666"
-                  secureTextEntry={!visible}
+                  placeholderTextColor={colors.grayText}
                   value={password}
                   onChangeText={setPassword}
-                  returnKeyType="done"
+                  secureTextEntry={!visible}
+                  editable={!loading}
                 />
                 <TouchableOpacity
-                  onPress={() => setVisible((v) => !v)}
-                  accessibilityLabel={visible ? 'Ocultar senha' : 'Mostrar senha'}
                   style={styles.rightIconTouch}
+                  onPress={() => setVisible(!visible)}
+                  disabled={loading}
                 >
-                  <Ionicons name={visible ? 'eye' : 'eye-off'} size={20} color="#333" />
+                  <MaterialIcons
+                    name={visible ? "visibility" : "visibility-off"}
+                    size={22}
+                    color={colors.grayText}
+                  />
                 </TouchableOpacity>
               </View>
             </View>
 
-            <TouchableOpacity
-              style={styles.button}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              onPress={() => {
-                // mocked credentials: login 'gabi' and password '123'
-                if (login === 'gabi' && password === '123') {
-                  setError(null);
-                  router.replace('/home');
-                } else {
-                  setError('Login ou senha inválidos (use gabi / 123)');
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Entrar</Text>
+            {error && <Text style={styles.errorText}>{error}</Text>}
+
+            <TouchableOpacity style={styles.forgotPassword}>
+              <Text style={styles.forgotText}>ESQUECEU A SENHA?</Text>
             </TouchableOpacity>
 
-            {error ? <Text style={{ color: '#FF6666', marginTop: 8 }}>{error}</Text> : null}
-          </View>
+            <TouchableOpacity 
+              style={styles.loginButton} 
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color={colors.white} />
+              ) : (
+                <Text style={styles.loginText}>ENTRAR</Text>
+              )}
+            </TouchableOpacity>
 
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>© Self-fit</Text>
+            <TouchableOpacity
+              style={styles.registerButton}
+              onPress={() => router.push('/register')}
+              disabled={loading}
+            >
+              <Text style={styles.registerText}>CADASTRAR</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -114,101 +172,25 @@ export default function Login(): JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
+  safeArea: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
-  container: {
-    flex: 1,
-    paddingHorizontal: '6%',
-    justifyContent: 'space-evenly',
-  },
-  top: {
-    alignItems: 'center',
-    marginTop: height * 0.08,
-  },
-  topRow: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backTouch: {
-    padding: 8,
-    marginTop: 6,
-  },
-  logo: {
-    color: colors.white,
-    fontSize: Math.max(20, height * 0.035),
-    fontWeight: '700',
-  },
-  logoImage: {
-    width: Math.min(520, width * 0.95),
-    height: Math.max(180, height * 0.2),
-  },
-  center: {
-    alignItems: 'center',
-  },
-  title: {
-    color: colors.redBright,
-    fontFamily: 'AntonSC',
-    fontSize: 28,
-    marginTop: 18,
-    marginBottom: 18,
-  },
-  inputWrapper: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  inputRow: {
-    width: '100%',
-    backgroundColor: colors.inputBg,
-    borderRadius: 12,
-    height: 52,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  leftIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    color: '#000',
-    fontSize: 16,
-  },
-  rightIconTouch: {
-    marginLeft: 8,
-    padding: 6,
-  },
-  button: {
-    marginTop: 20,
-    width: '100%',
-    height: 52,
-    backgroundColor: colors.red,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonText: {
-    color: colors.white,
-    fontFamily: 'Anton',
-    fontSize: 16,
-  },
-  linkTouch: {
-    marginTop: 12,
-  },
-  linkText: {
-    color: colors.grayText,
-    fontSize: 13,
-    textDecorationLine: 'underline',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: Math.max(12, height * 0.05),
-  },
-  footerText: {
-    color: colors.grayText,
-    fontSize: 12,
-  },
+  container: { flex: 1, paddingHorizontal: 24, justifyContent: 'center' },
+  topRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 20 },
+  backTouch: { padding: 8, marginTop: 6 },
+  header: { alignItems: 'center', marginTop: -20 },
+  logoImage: { width: Math.min(520, width * 0.95), height: Math.max(180, height * 0.2) },
+  center: { alignItems: 'center' },
+  title: { color: colors.redBright, fontFamily: 'AntonSC', fontSize: 28, marginTop: 18, marginBottom: 18 },
+  inputWrapper: { width: '100%', alignItems: 'center' },
+  inputRow: { width: '100%', backgroundColor: colors.inputBg, borderRadius: 12, height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+  leftIcon: { marginRight: 8 },
+  input: { flex: 1, color: colors.white, fontSize: 16 },
+  rightIconTouch: { marginLeft: 8, padding: 4 },
+  errorText: { color: colors.red, marginTop: 12, fontSize: 14, textAlign: 'center', fontWeight: '600' },
+  forgotPassword: { marginTop: 12, alignSelf: 'flex-end', paddingVertical: 8 },
+  forgotText: { color: colors.grayText, fontSize: 13, fontWeight: '600' },
+  loginButton: { marginTop: 24, width: '100%', height: 52, backgroundColor: colors.red, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  loginText: { color: colors.white, fontFamily: 'Anton', fontSize: 18, letterSpacing: 1 },
+  registerButton: { marginTop: 16, width: '100%', height: 52, borderWidth: 2, borderColor: '#333', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  registerText: { color: colors.white, fontFamily: 'Anton', fontSize: 16, letterSpacing: 1 },
 });
