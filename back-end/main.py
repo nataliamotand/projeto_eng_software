@@ -7,7 +7,7 @@ from database import SessionLocal, engine
 from datetime import date
 import models, schemas, auth
 
-# Garante que as novas tabelas sejam criadas no Neon
+# Garante que as novas tabelas (Notificações/Seguidores) sejam criadas
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API Self-Fit")
@@ -40,11 +40,12 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=401, detail="Incorreto")
     return {"access_token": auth.criar_token_acesso({"sub": u.email, "perfil": u.tipo_perfil}), "token_type": "bearer"}
 
-# --- NOTIFICAÇÕES E SOCIAL ---
+# --- NOTIFICAÇÕES E SOCIAL (COM AS NOVAS REGRAS) ---
 @app.get("/notificacoes", response_model=List[schemas.NotificacaoResponse])
 def listar_notificacoes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     notifs = db.query(models.Notificacao).filter(models.Notificacao.destinatario_id == u.id).all()
+    # Marca como lido apenas os tipos informativos
     for n in notifs:
         if n.tipo in ['VINCULO_PROFESSOR', 'NOVA_ROTINA'] and n.status == 'PENDENTE':
             n.status = 'LIDO'
@@ -54,9 +55,42 @@ def listar_notificacoes(email: str = Depends(auth.obter_usuario_atual), db: Sess
 @app.post("/usuarios/seguir/{destino_id}")
 def solicitar_seguir(destino_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    destino_u = db.query(models.Usuario).filter(models.Usuario.id == destino_id).first()
+
+    # Validação 1: O destino existe?
+    if not destino_u:
+        raise HTTPException(status_code=404, detail="Usuário destino não encontrado.")
+
+    # Validação 2: Narcisismo (seguir a si mesmo)
+    if meu_u.id == destino_id:
+        raise HTTPException(status_code=400, detail="Você não pode seguir a si mesmo.")
+
+    # REGRA DE NEGÓCIO: Apenas Alunos seguem Alunos
+    # Se o remetente for professor, ele não pode seguir ninguém.
+    if meu_u.tipo_perfil == "TEACHER":
+        raise HTTPException(
+            status_code=403, 
+            detail="Professores não podem seguir outros usuários. Utilize o vínculo oficial para gerir seus alunos."
+        )
+    
+    # Se o destino for professor, ele não pode ser seguido por alunos.
+    if destino_u.tipo_perfil == "TEACHER":
+        raise HTTPException(
+            status_code=403, 
+            detail="Não é permitido seguir perfis de professores. Alunos só podem seguir outros alunos."
+        )
+
+    # Se passou pelas travas, cria o registro social
     novo_s = models.Seguidor(seguidor_id=meu_u.id, seguido_id=destino_id)
     db.add(novo_s); db.flush()
-    disparar_notificacao(db, destino_id, meu_u.id, "Pedido para Seguir", f"{meu_u.nome} quer seguir você.", "SOLICITACAO_SEGUIR", novo_s.id)
+    
+    # Dispara a notificação para o alvo
+    disparar_notificacao(
+        db, destino_id, meu_u.id, 
+        "Pedido para Seguir", f"{meu_u.nome} quer seguir você.", 
+        "SOLICITACAO_SEGUIR", novo_s.id
+    )
+    
     db.commit()
     return {"mensagem": "Solicitação enviada com sucesso"}
 
@@ -83,6 +117,10 @@ def criar_ficha(ficha_dados: schemas.FichaTreinoCreate, email: str = Depends(aut
 def vincular(professor_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     p = db.query(models.Professor).filter(models.Professor.id == professor_id).first()
+    
+    if not p:
+        raise HTTPException(status_code=404, detail="Professor não encontrado.")
+    
     u.perfil_aluno.professor_id = p.id
     disparar_notificacao(db, p.usuario_id, u.id, "Novo Aluno", f"{u.nome} vinculou-se a você.", "VINCULO_PROFESSOR")
     db.commit(); return {"mensagem": "Vinculado!"}
