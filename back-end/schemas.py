@@ -1,11 +1,13 @@
 from pydantic import BaseModel
+from datetime import date
 from typing import List, Optional
 
-# --- ESQUEMAS PARA USUÁRIOS ---
+# --- USUÁRIOS ---
 class UsuarioCreate(BaseModel):
     nome: str
     email: str
     senha: str
+    data_nascimento: date
     tipo_perfil: str
 
 class UsuarioResponse(BaseModel):
@@ -15,49 +17,62 @@ class UsuarioResponse(BaseModel):
     tipo_perfil: str
 
     class Config:
-        from_attributes = True
+        from_attributes = True # ESSA LINHA É OBRIGATÓRIA
 
-# --- ESQUEMAS PARA ALUNOS ---
+# --- PERFIS ---
+class ProfessorCreate(BaseModel):
+    cref: str
+
 class AlunoCreate(BaseModel):
-    usuario_id: int
-    peso: float
-    altura: float
     objetivo: str
+
+# --- EVOLUÇÃO (O "Array" da Gabi) ---
+class EvolucaoCreate(BaseModel):
+    peso: float
+    porcentagem_gordura: Optional[float] = None
+    massa_muscular: Optional[float] = None
+
+class EvolucaoResponse(BaseModel):
+    id: int
+    data_registro: date
+    peso: float
+    porcentagem_gordura: Optional[float]
+    massa_muscular: Optional[float]
+    class Config:
+        from_attributes = True
 
 class AlunoResponse(BaseModel):
     id: int
-    usuario_id: int
-    peso: float
-    altura: float
     objetivo: str
-
+    historico_evolucao: List[EvolucaoResponse] = []
     class Config:
         from_attributes = True
 
-# --- ESQUEMAS PARA EXERCÍCIOS ---
-class ExercicioCreate(BaseModel):
-    nome: str
-    grupo_muscular: str
+
+class ItemExercicioCreate(BaseModel):
+    exercicio_referencia_id: int
     series: int
-    repeticoes_base: int
-    carga_estimada: float
+    repeticoes: int
+    carga: float
+    observacao: Optional[str] = None
 
-class ExercicioResponse(ExercicioCreate):
-    id: int
-    ficha_id: int
-
-    class Config:
-        from_attributes = True
-
-# --- ESQUEMAS PARA FICHAS DE TREINO ---
 class FichaTreinoCreate(BaseModel):
     aluno_id: int
     titulo: str
-    status: Optional[str] = "ativa"
+    exercicios: List[ItemExercicioCreate] # Uma lista de exercícios já na criação
 
-class FichaTreinoResponse(FichaTreinoCreate):
+class ItemExercicioResponse(BaseModel):
     id: int
-    exercicios: List[ExercicioResponse] = []
+    exercicio_referencia_id: int
+    series: int
+    repeticoes: int
+    carga: float
+    observacao: Optional[str]
+    class Config: from_attributes = True
 
-    class Config:
-        from_attributes = True
+class FichaTreinoResponse(BaseModel):
+    id: int
+    titulo: str
+    status: str
+    exercicios: List[ItemExercicioResponse]
+    class Config: from_attributes = True
