@@ -22,7 +22,7 @@ import { colors } from '../src/components/ui/theme';
 
 const { height, width } = Dimensions.get('window');
 
-export default function Login(): JSX.Element {
+export default function Login(){
   const router = useRouter();
   
   // Estados para controlar o formulário e a interface
@@ -57,8 +57,11 @@ export default function Login(): JSX.Element {
       // Se chegamos aqui, o login deu 200 OK
       const token = response.data.access_token;
       
-      // Salvamos o token no "HD" do celular para a Home poder usar
-      await AsyncStorage.setItem('userToken', token);
+      /**
+       * CORREÇÃO CRUCIAL: 
+       * Usamos a chave 'token' para bater com o que o interceptor no api.ts busca.
+       */
+      await AsyncStorage.setItem('token', token); 
       
       console.log('Login OK! Navegando para a Home...');
       router.push('/home');
@@ -83,7 +86,6 @@ export default function Login(): JSX.Element {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={styles.container}>
-          {/* Botão de Voltar (Design da Gabrielli) */}
           <View style={styles.topRow}>
             <TouchableOpacity
               style={styles.backTouch}
@@ -93,7 +95,6 @@ export default function Login(): JSX.Element {
             </TouchableOpacity>
           </View>
 
-          {/* Logo do Self-Fit */}
           <View style={styles.header}>
             <Image
               source={require('../assets/images/logo.png')}
@@ -105,7 +106,6 @@ export default function Login(): JSX.Element {
           <View style={styles.center}>
             <Text style={styles.title}>LOGIN</Text>
 
-            {/* Campos de Input */}
             <View style={styles.inputWrapper}>
               <View style={styles.inputRow}>
                 <Ionicons name="mail" size={20} color={colors.grayText} style={styles.leftIcon} />
@@ -145,14 +145,12 @@ export default function Login(): JSX.Element {
               </View>
             </View>
 
-            {/* Exibição de Erros */}
             {error && <Text style={styles.errorText}>{error}</Text>}
 
             <TouchableOpacity style={styles.forgotPassword}>
               <Text style={styles.forgotText}>ESQUECEU A SENHA?</Text>
             </TouchableOpacity>
 
-            {/* Botão de Entrar (Com indicador de carregamento) */}
             <TouchableOpacity 
               style={styles.loginButton} 
               onPress={handleLogin}
@@ -179,7 +177,6 @@ export default function Login(): JSX.Element {
   );
 }
 
-// Estilos preservados conforme o design original
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   flex: { flex: 1 },
