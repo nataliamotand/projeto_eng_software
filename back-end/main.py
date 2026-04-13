@@ -7,7 +7,6 @@ from database import SessionLocal, engine
 from datetime import date
 import models, schemas, auth
 
-# Garante que as novas tabelas (Notificações/Seguidores) sejam criadas
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API Self-Fit")
@@ -18,7 +17,6 @@ def get_db():
     try: yield db
     finally: db.close()
 
-# Função utilitária para disparar notificações silenciosamente
 def disparar_notificacao(db: Session, dest_id: int, rem_id: Optional[int], titulo: str, msg: str, tipo: str, ref_id: Optional[int] = None):
     nova = models.Notificacao(destinatario_id=dest_id, remetente_id=rem_id, titulo=titulo, mensagem=msg, tipo=tipo, referencia_id=ref_id)
     db.add(nova)
@@ -40,66 +38,63 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=401, detail="Incorreto")
     return {"access_token": auth.criar_token_acesso({"sub": u.email, "perfil": u.tipo_perfil}), "token_type": "bearer"}
 
-# --- NOTIFICAÇÕES E SOCIAL (COM AS NOVAS REGRAS) ---
+# --- NOTIFICAÇÕES E SOCIAL ---
 @app.get("/notificacoes", response_model=List[schemas.NotificacaoResponse])
 def listar_notificacoes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     notifs = db.query(models.Notificacao).filter(models.Notificacao.destinatario_id == u.id).all()
-    # Marca como lido apenas os tipos informativos
     for n in notifs:
         if n.tipo in ['VINCULO_PROFESSOR', 'NOVA_ROTINA'] and n.status == 'PENDENTE':
             n.status = 'LIDO'
     db.commit()
     return notifs
 
+@app.put("/notificacoes/{notificacao_id}/responder")
+def responder_notificacao(notificacao_id: int, dados: schemas.RespostaNotificacao, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    notif = db.query(models.Notificacao).filter(models.Notificacao.id == notificacao_id, models.Notificacao.destinatario_id == u.id).first()
+    
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notificação não encontrada.")
+    
+    # Se for pedido de seguir, precisamos atualizar a tabela de seguidores também
+    if notif.tipo == "SOLICITACAO_SEGUIR":
+        seguidor_reg = db.query(models.Seguidor).filter(models.Seguidor.id == notif.referencia_id).first()
+        if seguidor_reg:
+            if dados.acao == "ACEITAR":
+                seguidor_reg.status = "ACEITO"
+                notif.status = "ACEITO"
+            else:
+                db.delete(seguidor_reg) # Se recusar, removemos o vínculo pendente
+                notif.status = "REJEITADO"
+    
+    db.commit()
+    return {"mensagem": f"Solicitação {dados.acao.lower()} com sucesso."}
+
 @app.post("/usuarios/seguir/{destino_id}")
 def solicitar_seguir(destino_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     destino_u = db.query(models.Usuario).filter(models.Usuario.id == destino_id).first()
 
-    # Validação 1: O destino existe?
     if not destino_u:
-        raise HTTPException(status_code=404, detail="Usuário destino não encontrado.")
-
-    # Validação 2: Narcisismo (seguir a si mesmo)
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
     if meu_u.id == destino_id:
-        raise HTTPException(status_code=400, detail="Você não pode seguir a si mesmo.")
+        raise HTTPException(status_code=400, detail="Não pode seguir a si mesmo.")
+    if meu_u.tipo_perfil == "TEACHER" or destino_u.tipo_perfil == "TEACHER":
+        raise HTTPException(status_code=403, detail="Apenas alunos podem seguir outros alunos.")
 
-    # REGRA DE NEGÓCIO: Apenas Alunos seguem Alunos
-    # Se o remetente for professor, ele não pode seguir ninguém.
-    if meu_u.tipo_perfil == "TEACHER":
-        raise HTTPException(
-            status_code=403, 
-            detail="Professores não podem seguir outros usuários. Utilize o vínculo oficial para gerir seus alunos."
-        )
-    
-    # Se o destino for professor, ele não pode ser seguido por alunos.
-    if destino_u.tipo_perfil == "TEACHER":
-        raise HTTPException(
-            status_code=403, 
-            detail="Não é permitido seguir perfis de professores. Alunos só podem seguir outros alunos."
-        )
-
-    # Se passou pelas travas, cria o registro social
     novo_s = models.Seguidor(seguidor_id=meu_u.id, seguido_id=destino_id)
     db.add(novo_s); db.flush()
-    
-    # Dispara a notificação para o alvo
-    disparar_notificacao(
-        db, destino_id, meu_u.id, 
-        "Pedido para Seguir", f"{meu_u.nome} quer seguir você.", 
-        "SOLICITACAO_SEGUIR", novo_s.id
-    )
-    
+    disparar_notificacao(db, destino_id, meu_u.id, "Pedido para Seguir", f"{meu_u.nome} quer seguir você.", "SOLICITACAO_SEGUIR", novo_s.id)
     db.commit()
     return {"mensagem": "Solicitação enviada com sucesso"}
 
-# --- FICHAS E TREINOS ---
+# --- FICHAS E TREINOS (Mantidos) ---
 @app.post("/fichas", response_model=schemas.FichaTreinoResponse)
 def criar_ficha(ficha_dados: schemas.FichaTreinoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u_prof = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if not u_prof.perfil_professor:
-        raise HTTPException(status_code=403, detail="Apenas professores podem criar fichas.")
+        raise HTTPException(status_code=403, detail="Apenas professores.")
     
     nova_ficha = models.FichaTreino(aluno_id=ficha_dados.aluno_id, titulo=ficha_dados.titulo, criado_por_professor=True)
     db.add(nova_ficha); db.flush()
@@ -117,15 +112,11 @@ def criar_ficha(ficha_dados: schemas.FichaTreinoCreate, email: str = Depends(aut
 def vincular(professor_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     p = db.query(models.Professor).filter(models.Professor.id == professor_id).first()
-    
-    if not p:
-        raise HTTPException(status_code=404, detail="Professor não encontrado.")
-    
     u.perfil_aluno.professor_id = p.id
     disparar_notificacao(db, p.usuario_id, u.id, "Novo Aluno", f"{u.nome} vinculou-se a você.", "VINCULO_PROFESSOR")
     db.commit(); return {"mensagem": "Vinculado!"}
 
-# --- PERFIS E EVOLUÇÃO ---
+# --- PERFIS E EVOLUÇÃO (Mantidos) ---
 @app.post("/professores")
 def criar_perfil_professor(perfil: schemas.ProfessorCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()

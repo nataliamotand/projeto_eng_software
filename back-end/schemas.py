@@ -74,3 +74,7 @@ class NotificacaoResponse(BaseModel):
     remetente_id: Optional[int]
     referencia_id: Optional[int]
     class Config: from_attributes = True
+
+# --- NOVO SCHEMA PARA RESPOSTA ---
+class RespostaNotificacao(BaseModel):
+    acao: str # 'ACEITAR' ou 'RECUSAR'
