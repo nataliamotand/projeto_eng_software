@@ -1,7 +1,7 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Date, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import date
+from datetime import date, datetime
 
 class Usuario(Base):
     __tablename__ = "usuarios"
@@ -12,28 +12,35 @@ class Usuario(Base):
     data_nascimento = Column(Date, nullable=False)
     tipo_perfil = Column(String, nullable=False) # 'STUDENT' ou 'TEACHER'
 
+    # Relacionamentos de Perfil
     perfil_aluno = relationship("Aluno", back_populates="usuario", uselist=False)
     perfil_professor = relationship("Professor", back_populates="usuario", uselist=False)
+    
+    # --- INTEGRAÇÃO NATÁLIA: Social e Notificações ---
+    notificacoes_recebidas = relationship("Notificacao", foreign_keys="[Notificacao.destinatario_id]", back_populates="destinatario")
+    seguidores = relationship("Seguidor", foreign_keys="[Seguidor.seguido_id]", back_populates="seguido")
+    seguindo = relationship("Seguidor", foreign_keys="[Seguidor.seguidor_id]", back_populates="seguidor")
 
 class Professor(Base):
     __tablename__ = "professores"
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
-    
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
+    cref = Column(String, unique=True, nullable=True) # Adicionado por ela
+
     usuario = relationship("Usuario", back_populates="perfil_professor")
     alunos = relationship("Aluno", back_populates="professor")
 
 class Aluno(Base):
     __tablename__ = "alunos"
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("usuarios.id"))
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
     professor_id = Column(Integer, ForeignKey("professores.id"), nullable=True) 
+    objetivo = Column(String, nullable=True) # Adicionado por ela
     
-    # --- O APERTO DE MÃO (BACK-POPULATES) ESTÁ TODO AQUI ---
     usuario = relationship("Usuario", back_populates="perfil_aluno")
     professor = relationship("Professor", back_populates="alunos")
-    rotinas = relationship("Rotina", back_populates="aluno")
-    historico_evolucao = relationship("Evolucao", back_populates="aluno")
+    rotinas = relationship("Rotina", back_populates="aluno") # SUA CLASSE (Mantida!)
+    historico_evolucao = relationship("Evolucao", back_populates="aluno", cascade="all, delete-orphan")
     fichas = relationship("FichaTreino", back_populates="aluno")
 
 class Evolucao(Base):
@@ -53,6 +60,7 @@ class FichaTreino(Base):
     aluno_id = Column(Integer, ForeignKey("alunos.id"))
     titulo = Column(String)
     status = Column(String, default="ativa")
+    criado_por_professor = Column(Boolean, default=False) # Flag integrada
 
     aluno = relationship("Aluno", back_populates="fichas")
     exercicios = relationship("ItemExercicio", back_populates="ficha", cascade="all, delete-orphan")
@@ -69,6 +77,7 @@ class ItemExercicio(Base):
 
     ficha = relationship("FichaTreino", back_populates="exercicios")
 
+# --- SUA CLASSE DE ROTINAS (Essencial para seu Front) ---
 class Rotina(Base):
     __tablename__ = "rotinas"
     id = Column(Integer, primary_key=True, index=True)
@@ -78,3 +87,30 @@ class Rotina(Base):
     status = Column(String, default="pending")
 
     aluno = relationship("Aluno", back_populates="rotinas")
+
+# --- NOVAS TABELAS SOCIAIS (Natália) ---
+class Seguidor(Base):
+    __tablename__ = "seguidores"
+    id = Column(Integer, primary_key=True, index=True)
+    seguidor_id = Column(Integer, ForeignKey("usuarios.id"))
+    seguido_id = Column(Integer, ForeignKey("usuarios.id"))
+    status = Column(String, default="PENDENTE")
+    data_criacao = Column(DateTime, default=datetime.utcnow)
+
+    seguidor = relationship("Usuario", foreign_keys=[seguidor_id], back_populates="seguindo")
+    seguido = relationship("Usuario", foreign_keys=[seguido_id], back_populates="seguidores")
+
+class Notificacao(Base):
+    __tablename__ = "notificacoes"
+    id = Column(Integer, primary_key=True, index=True)
+    destinatario_id = Column(Integer, ForeignKey("usuarios.id"), index=True)
+    remetente_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    titulo = Column(String, nullable=False)
+    mensagem = Column(String, nullable=False)
+    tipo = Column(String, nullable=False)
+    status = Column(String, default="PENDENTE")
+    referencia_id = Column(Integer, nullable=True)
+    data_criacao = Column(DateTime, default=datetime.utcnow)
+
+    destinatario = relationship("Usuario", foreign_keys=[destinatario_id], back_populates="notificacoes_recebidas")
+    remetente = relationship("Usuario", foreign_keys=[remetente_id])

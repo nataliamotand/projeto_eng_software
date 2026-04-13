@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import date
+from datetime import date, datetime
 from typing import List, Optional
 
 # --- USUÁRIOS ---
@@ -15,9 +15,7 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     tipo_perfil: str
-
-    class Config:
-        from_attributes = True 
+    class Config: from_attributes = True 
 
 # --- PERFIS ---
 class ProfessorCreate(BaseModel):
@@ -38,19 +36,15 @@ class EvolucaoResponse(BaseModel):
     peso: float
     porcentagem_gordura: Optional[float]
     massa_muscular: Optional[float]
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 # --- ALUNO COMPLETO ---
 class AlunoResponse(BaseModel):
     id: int
     objetivo: str
-    professor_id: Optional[int] = None # Adicionado para bater com o novo model
+    professor_id: Optional[int] = None
     historico_evolucao: List[EvolucaoResponse] = []
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
 
 # --- FICHAS E EXERCÍCIOS ---
 class ItemExercicioCreate(BaseModel):
@@ -72,20 +66,17 @@ class ItemExercicioResponse(BaseModel):
     repeticoes: int
     carga: float
     observacao: Optional[str]
-    
-    class Config: 
-        from_attributes = True
+    class Config: from_attributes = True
 
 class FichaTreinoResponse(BaseModel):
     id: int
     titulo: str
     status: str
+    criado_por_professor: bool # Integrado do código dela
     exercicios: List[ItemExercicioResponse]
-    
-    class Config: 
-        from_attributes = True
+    class Config: from_attributes = True
 
-# --- ROTINAS ---
+# --- ROTINAS (Sua estrutura original preservada) ---
 class RotinaBase(BaseModel):
     title: str
     criado_por_professor: bool = False
@@ -94,9 +85,22 @@ class RotinaBase(BaseModel):
 class RotinaCreate(RotinaBase):
     pass
 
-class RotinaResponse(RotinaBase): # Renomeado para consistência
+class RotinaResponse(RotinaBase): 
     id: int
     aluno_id: int
+    class Config: from_attributes = True
 
-    class Config:
-        from_attributes = True
+# --- NOTIFICAÇÕES E SOCIAL (Novos da Natália) ---
+class NotificacaoResponse(BaseModel):
+    id: int
+    titulo: str
+    mensagem: str
+    tipo: str
+    status: str
+    data_criacao: datetime
+    remetente_id: Optional[int]
+    referencia_id: Optional[int]
+    class Config: from_attributes = True
+
+class RespostaNotificacao(BaseModel):
+    acao: str # 'ACEITAR' ou 'RECUSAR'
