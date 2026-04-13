@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -11,67 +11,39 @@ import {
   Dimensions,
   Modal,
   Pressable,
+  ActivityIndicator,
+  Alert
 } from 'react-native';
-import { FontAwesome, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { Ionicons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
+import api from '../src/services/api'; 
 
 const { width } = Dimensions.get('window');
 
-// TODO: Implementar lógica para obter o perfil real do usuário (STUDENT/TEACHER)
-const USER_PROFILE = 'STUDENT'; // focus implementation on STUDENT layout
-
-const mockedRoutines = [
-  {
-    id: 1,
-    title: 'Perna e Glúteo',
-    approvedBy: 'Natália',
-    exercises: 6,
-    series: 18,
-    status: 'approved',
-  },
-  {
-    id: 2,
-    title: 'Superior e Core',
-    approvedBy: 'Professor Carlos',
-    exercises: 5,
-    series: 15,
-    status: 'approved',
-  },
-  {
-    id: 3,
-    title: 'Cardio Leve',
-    approvedBy: null,
-    exercises: 4,
-    series: 12,
-    status: 'pending',
-  },
-];
-
-function Header() {
-  const router = require('expo-router').useRouter();
+// 1. COMPONENTE DE HEADER DINÂMICO
+function Header({ user }: { user: any }) {
+  const router = useRouter();
 
   return (
     <View style={styles.header}>
       <View style={styles.headerDetail} pointerEvents="none" />
-
       <View style={styles.headerLeft}>
         <View style={styles.avatar}>
           <Image source={require('../assets/images/logo.png')} style={styles.avatarImage} resizeMode="contain" />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>Gabrielli Valelia</Text>
-          <Text style={styles.userHandle}>@valeliagabi</Text>
+          <Text style={styles.userName}>{user?.nome || 'Carregando...'}</Text>
+          <Text style={styles.userHandle}>@{user?.email?.split('@')[0] || 'usuario'}</Text>
         </View>
       </View>
 
       <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/add_friends'); }}>
+        <TouchableOpacity style={styles.iconTouch} onPress={() => router.push('/add_friends')}>
           <FontAwesome name="user-plus" size={20} color={colors.white} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.iconTouch} onPress={() => { router.push('/notifications'); }}>
+        <TouchableOpacity style={styles.iconTouch} onPress={() => router.push('/notifications')}>
           <Ionicons name="notifications-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
@@ -79,220 +51,167 @@ function Header() {
   );
 }
 
-function RoutineCard({ item, onToggleMenu, onStart }: { item: any; onToggleMenu: () => void; onStart: () => void; }) {
-  return (
-    <View style={styles.card}>
-      <TouchableOpacity style={styles.cardOptions} onPress={onToggleMenu}>
-        <MaterialIcons name="more-vert" size={20} color={colors.grayText} />
-      </TouchableOpacity>
-
-      <Text style={styles.cardTitle}>{item.title}</Text>
-
-      <View style={styles.cardRow}>
-        <View style={styles.approvedRow}>
-          <FontAwesome name={item.status === 'approved' ? 'check-circle' : 'clock-o'} size={14} color={colors.grayText} />
-          <Text style={styles.approvedText}>
-            {item.status === 'approved' ? ` Aprovada por ${item.approvedBy ?? '—'}` : ' Pendente'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.statsRow}>
-        <Text style={styles.statText}>{`${item.exercises} Exercícios`}</Text>
-        <Text style={styles.statText}>{`${item.series} Séries`}</Text>
-      </View>
-
-      <TouchableOpacity style={styles.startButton} onPress={onStart}>
-        <Text style={styles.startButtonText}>Iniciar Rotina</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function BottomNav() {
+export default function RoutinesAndWorkouts() {
   const router = useRouter();
-
-  return (
-    <View style={styles.bottomNav}>
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push('/home')}>
-        <FontAwesome name="home" size={24} color={colors.grayText} />
-      </TouchableOpacity>
-
-      <View style={styles.centerNavWrapper}>
-        <TouchableOpacity style={styles.centerButton} onPress={() => router.push('/routines_and_workouts')}>
-          <MaterialIcons name="fitness-center" size={28} color={colors.red} />
-        </TouchableOpacity>
-        <View style={styles.centerIndicator} />
-      </View>
-
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push('/clients')}>
-        <MaterialCommunityIcons name="account-group" size={24} color={colors.grayText} />
-      </TouchableOpacity>
-
-      <TouchableOpacity style={styles.navItem} onPress={() => router.push('/profile')}>
-        <FontAwesome name="user" size={24} color={colors.grayText} />
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-export default function RoutinesAndWorkouts(): JSX.Element {
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [routines, setRoutines] = useState<any[]>([]);
+  
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestMessage, setRequestMessage] = useState('');
-  const [routines, setRoutines] = useState(mockedRoutines);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const router = useRouter();
 
-  function handleToggleMenu(id: number) {
-    setOpenMenuId((cur) => (cur === id ? null : id));
+  async function loadData() {
+    try {
+      setLoading(true);
+      try {
+        const userRes = await api.get('/usuarios/me');
+        setUser(userRes.data);
+      } catch (err) { console.error("Erro ao carregar usuário:", err); }
+
+      try {
+        const routinesRes = await api.get('/alunos/minhas-rotinas');
+        setRoutines(routinesRes.data);
+      } catch (err) { console.error("Erro ao carregar rotinas:", err); }
+    } finally {
+      setLoading(false);
+    }
   }
 
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const selectedRoutine = routines.find(r => r.id === openMenuId);
+  const isProfessorRoutine = selectedRoutine?.criado_por_professor === true;
+
   function handleEdit(id: number) {
+    if (isProfessorRoutine) {
+      Alert.alert("Bloqueado", "Esta rotina foi criada pelo professor e não pode ser editada.");
+      return;
+    }
     setOpenMenuId(null);
     router.push(`/create_routine?id=${id}`);
   }
 
   function handleDelete(id: number) {
+    if (isProfessorRoutine) return;
     setOpenMenuId(null);
-    setRoutines((prev) => prev.filter((r) => r.id !== id));
+    // Aqui viria a lógica de delete no banco
   }
+
+  function handleSendRequest() {
+    if (!requestMessage.trim()) {
+      Alert.alert("Erro", "O texto da solicitação não pode ser nulo.");
+      return;
+    }
+    console.log('Notificação enviada para professor:', requestMessage);
+    setRequestMessage('');
+    setShowRequestModal(false);
+    Alert.alert("Enviado", "Sua solicitação foi encaminhada ao professor.");
+  }
+
+  if (loading) return <View style={styles.loadingArea}><ActivityIndicator color={colors.red} size="large" /></View>;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header />
+      <Header user={user} />
 
       <View style={styles.container}>
         <View style={styles.inner}>
-
-          <TouchableOpacity
-            style={styles.newRoutineButton}
-            onPress={() => {
-              setShowNewMenu((s) => !s);
-            }}
-          >
+          
+          <TouchableOpacity style={styles.newRoutineButton} onPress={() => setShowNewMenu(!showNewMenu)}>
             <MaterialIcons name="note-add" size={20} color={colors.white} />
             <Text style={styles.newRoutineText}>Nova Rotina</Text>
           </TouchableOpacity>
 
           {showNewMenu && (
             <View style={styles.newMenu}>
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setShowNewMenu(false);
-                  router.push('/create_routine');
-                }}
-              >
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setShowNewMenu(false); router.push('/create_routine'); }}>
                 <FontAwesome name="plus-circle" size={18} color={colors.white} />
-                <Text style={styles.menuText}>Criar nova rotina</Text>
+                <Text style={styles.menuText}>Seguir por conta própria</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  setShowNewMenu(false);
-                  setShowRequestModal(true);
-                }}
-              >
+              <TouchableOpacity style={styles.menuItem} onPress={() => { setShowNewMenu(false); setShowRequestModal(true); }}>
                 <Ionicons name="mail" size={18} color={colors.white} />
-                <Text style={styles.menuText}>Solicitar nova rotina</Text>
+                <Text style={styles.menuText}>Solicitar ao professor</Text>
               </TouchableOpacity>
             </View>
           )}
 
-          {/* Modal de solicitação de rotina */}
-          <Modal visible={showRequestModal} transparent animationType="slide" onRequestClose={() => setShowRequestModal(false)}>
-            <Pressable style={styles.modalBackdrop} onPress={() => setShowRequestModal(false)}>
-              <View style={styles.modalContentCentered}>
-                <Text style={{ color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 8 }}>Solicitar nova rotina</Text>
-                <Text style={{ color: colors.grayText, marginBottom: 12 }}>Escreva sua solicitação ao professor/personal:</Text>
-                <TextInput
-                  style={styles.requestInput}
-                  placeholder="Descreva os objetivos, limitações e preferências..."
-                  placeholderTextColor="#9A9A9A"
-                  multiline
-                  numberOfLines={4}
-                  value={requestMessage}
-                  onChangeText={setRequestMessage}
-                />
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>ROTINAS</Text>
+          </View>
 
-                <View style={styles.requestButtonsRow}>
-                  <TouchableOpacity
-                    style={[styles.requestButton, { backgroundColor: colors.darkRed }]}
-                    onPress={() => {
-                      // Simular envio: aqui você pode integrar com backend/rota de mensagens
-                      console.log('Solicitação enviada:', requestMessage);
-                      setRequestMessage('');
-                      setShowRequestModal(false);
-                    }}
+          <FlatList
+            data={routines}
+            keyExtractor={(item) => String(item.id)}
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                {/* CORREÇÃO 1: Menu só aparece se NÃO for do professor */}
+                {!item.criado_por_professor && (
+                  <TouchableOpacity 
+                    style={styles.cardOptions} 
+                    onPress={() => setOpenMenuId(item.id)}
                   >
-                    <Text style={[styles.requestButtonText, { color: colors.white }]}>Enviar</Text>
+                    <MaterialIcons name="more-vert" size={20} color={colors.grayText} />
                   </TouchableOpacity>
+                )}
 
-                  <TouchableOpacity
-                    style={[styles.requestButton, { backgroundColor: '#222', marginLeft: 8 }]}
-                    onPress={() => {
-                      setRequestMessage('');
-                      setShowRequestModal(false);
-                    }}
-                  >
-                    <Text style={[styles.requestButtonText, { color: colors.grayText }]}>Cancelar</Text>
-                  </TouchableOpacity>
+                <Text style={styles.cardTitle}>{item.title}</Text>
+                <View style={styles.cardRow}>
+                  <FontAwesome name={item.status === 'approved' ? 'check-circle' : 'clock-o'} size={14} color={colors.grayText} />
+                  <Text style={styles.approvedText}>
+                    {item.criado_por_professor ? ` Criada pelo Professor` : ` Sua rotina`}
+                  </Text>
                 </View>
+                <TouchableOpacity style={styles.startButton} onPress={() => router.push(`/workout?id=${item.id}`)}>
+                  <Text style={styles.startButtonText}>Iniciar Rotina</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            contentContainerStyle={styles.list}
+          />
+
+          <Modal visible={openMenuId !== null} transparent animationType="fade">
+            <Pressable style={styles.modalBackdrop} onPress={() => setOpenMenuId(null)}>
+              <View style={styles.modalContentCentered}>
+                <Text style={styles.modalAlertText}>Opções da Rotina</Text>
+                <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleEdit(openMenuId!)}>
+                  <Text style={styles.modalOptionText}>Editar rotina</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.modalOptionButton, { marginTop: 8 }]} onPress={() => handleDelete(openMenuId!)}>
+                  <Text style={[styles.modalOptionText, { color: colors.red }]}>Excluir rotina</Text>
+                </TouchableOpacity>
               </View>
             </Pressable>
           </Modal>
 
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>ROTINAS</Text>
-            <TouchableOpacity style={styles.filterTouch} onPress={() => { /* TODO: abrir filtro */ }}>
-              <Text style={styles.filterText}>Todas</Text>
-              <Ionicons name="chevron-down" size={18} color={colors.white} />
-            </TouchableOpacity>
-          </View>
-
-          {USER_PROFILE === 'STUDENT' && (
-            <>
-              <FlatList
-                data={routines}
-                keyExtractor={(r) => String(r.id)}
-                renderItem={({ item }) => (
-                  <RoutineCard
-                    item={item}
-                    onToggleMenu={() => handleToggleMenu(item.id)}
-                    onStart={() => router.push(`/workout?id=${item.id}`)}
-                  />
-                )}
-                contentContainerStyle={styles.list}
-                showsVerticalScrollIndicator={false}
-              />
-
-              <Modal visible={openMenuId !== null} transparent animationType="fade" onRequestClose={() => setOpenMenuId(null)}>
-                <Pressable style={styles.modalBackdrop} onPress={() => setOpenMenuId(null)}>
-                  <View style={styles.modalContentCentered}>
-                    <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleEdit(openMenuId as number)}>
-                      <Text style={styles.modalOptionText}>Editar rotina</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={[styles.modalOptionButton, { marginTop: 8 }]} onPress={() => handleDelete(openMenuId as number)}>
-                      <Text style={[styles.modalOptionText, { color: colors.red }]}>Excluir rotina</Text>
-                    </TouchableOpacity>
-                  </View>
-                </Pressable>
-              </Modal>
-            </>
-          )}
-
-          {USER_PROFILE === 'TEACHER' && (
-            <View>
-              {/* TODO: implementar view TEACHER */}
+          <Modal visible={showRequestModal} transparent animationType="slide">
+            <View style={styles.modalBackdrop}>
+              <View style={styles.modalContentCentered}>
+                <Text style={styles.modalTitle}>Solicitar ao professor</Text>
+                <TextInput
+                  style={styles.requestInput}
+                  placeholder="Ex: Gostaria de focar em ombros essa semana..."
+                  placeholderTextColor="#666"
+                  multiline
+                  value={requestMessage}
+                  onChangeText={setRequestMessage}
+                />
+                <View style={styles.requestButtonsRow}>
+                  <TouchableOpacity style={[styles.requestButton, { backgroundColor: colors.red }]} onPress={handleSendRequest}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Enviar Pedido</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-          )}
+          </Modal>
+
         </View>
       </View>
 
-      <StickyFooter active="workouts" />
+      <StickyFooter active="workouts" userProfile={user?.tipo_perfil} />
     </SafeAreaView>
   );
 }
@@ -302,7 +221,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.red,
     paddingHorizontal: 16,
-    paddingTop: 26,
+    paddingTop: 45,
     paddingBottom: 18,
     flexDirection: 'row',
     alignItems: 'center',
@@ -323,21 +242,20 @@ const styles = StyleSheet.create({
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: '#000',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  avatarImage: { width: 42, height: 26 },
+  avatarImage: { width: 40, height: 24 },
   userInfo: { flexDirection: 'column' },
   userName: { color: colors.white, fontSize: 16, fontWeight: '700' },
   userHandle: { color: colors.white, fontSize: 12, marginTop: 2 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   iconTouch: { marginLeft: 14, padding: 6 },
-
   container: { flex: 1, backgroundColor: colors.background },
   inner: {
     flex: 1,
@@ -348,8 +266,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 18,
   },
-  pageTitle: { color: colors.white, fontSize: 14, marginBottom: 12, fontWeight: '700' },
-
+  loadingArea: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   newRoutineButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -360,117 +277,91 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   newRoutineText: { color: colors.white, marginLeft: 8, fontWeight: '700' },
-
   newMenu: {
     backgroundColor: '#121212',
     borderRadius: 10,
     paddingVertical: 6,
-    marginTop: 8,
+    marginBottom: 12,
     paddingHorizontal: 8,
   },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 6 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 },
   menuText: { color: colors.white, marginLeft: 10, fontSize: 14 },
-
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  sectionTitle: { color: colors.white, fontSize: 22, fontFamily: 'Anton', fontWeight: '700' },
-  filterTouch: { flexDirection: 'row', alignItems: 'center' },
-  filterText: { color: colors.white, marginRight: 6 },
-
-  list: { paddingBottom: 32 },
-
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
+  sectionTitle: { color: colors.white, fontSize: 24, fontWeight: '700' },
+  list: { paddingBottom: 100 },
   card: {
     backgroundColor: colors.cardBg,
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     marginBottom: 12,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
   },
-  cardOptions: { position: 'absolute', right: 8, top: 8, padding: 6 },
-  cardTitle: { color: colors.red, fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  approvedRow: { flexDirection: 'row', alignItems: 'center' },
-  approvedText: { color: colors.grayText, marginLeft: 6 },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  statText: { color: colors.grayText },
-
+  // CORREÇÃO 2: Hitbox aumentada e Pointer Cursor
+  cardOptions: { 
+    position: 'absolute', 
+    right: 0, 
+    top: 0, 
+    padding: 20, // Hitbox maior para facilitar o toque
+    zIndex: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // @ts-ignore
+    cursor: 'pointer' 
+  },
+  cardTitle: { color: colors.red, fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  approvedText: { color: colors.grayText, marginLeft: 8, fontSize: 13 },
   startButton: {
-    marginTop: 12,
-    backgroundColor: colors.startGray,
-    height: 40,
+    marginTop: 15,
+    backgroundColor: '#222',
+    height: 45,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
   },
   startButtonText: { color: colors.white, fontWeight: '700' },
-
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
   },
   modalContentCentered: {
-    backgroundColor: '#0A0A0A',
-    padding: 20,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    borderColor: '#111',
+    backgroundColor: '#0F0F0F',
+    padding: 24,
+    borderRadius: 16,
     borderWidth: 1,
-    alignItems: 'stretch',
+    borderColor: '#222',
     width: '100%',
   },
+  modalTitle: { color: colors.white, fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
+  modalAlertText: { color: colors.grayText, fontSize: 12, textAlign: 'center', marginBottom: 15, textTransform: 'uppercase' },
   modalOptionButton: {
-    backgroundColor: '#111',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    width: '100%',
+    backgroundColor: '#161616',
+    paddingVertical: 14,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  modalOptionText: {
-    color: colors.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-
+  modalOptionText: { color: colors.white, fontSize: 16, fontWeight: '600' },
   requestInput: {
-    backgroundColor: '#0B0B0B',
-    borderColor: '#222',
+    backgroundColor: '#050505',
+    borderColor: '#333',
     borderWidth: 1,
     color: colors.white,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     textAlignVertical: 'top',
-    minHeight: 100,
-    marginBottom: 12,
+    minHeight: 120,
+    marginBottom: 16,
   },
-  requestButtonsRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  requestButtonsRow: { flexDirection: 'row', justifyContent: 'center' },
   requestButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
     alignItems: 'center',
   },
-  requestButtonText: { fontWeight: '700' },
-
-  bottomNav: {
-    backgroundColor: colors.darkNav,
-    height: 64,
-    paddingVertical: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  navItem: { alignItems: 'center', justifyContent: 'center', width: 72, height: 64 },
-  centerNavWrapper: { alignItems: 'center', justifyContent: 'center' },
-  centerButton: {
-    backgroundColor: 'transparent',
-    padding: 6,
-    borderRadius: 28,
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerIndicator: { marginTop: 6, width: 28, height: 3, backgroundColor: colors.red, borderRadius: 2 },
 });
