@@ -17,7 +17,7 @@ class UsuarioResponse(BaseModel):
     tipo_perfil: str
 
     class Config:
-        from_attributes = True # ESSA LINHA É OBRIGATÓRIA
+        from_attributes = True 
 
 # --- PERFIS ---
 class ProfessorCreate(BaseModel):
@@ -26,7 +26,7 @@ class ProfessorCreate(BaseModel):
 class AlunoCreate(BaseModel):
     objetivo: str
 
-# --- EVOLUÇÃO (O "Array" da Gabi) ---
+# --- EVOLUÇÃO ---
 class EvolucaoCreate(BaseModel):
     peso: float
     porcentagem_gordura: Optional[float] = None
@@ -38,17 +38,21 @@ class EvolucaoResponse(BaseModel):
     peso: float
     porcentagem_gordura: Optional[float]
     massa_muscular: Optional[float]
+    
     class Config:
         from_attributes = True
 
+# --- ALUNO COMPLETO ---
 class AlunoResponse(BaseModel):
     id: int
     objetivo: str
+    professor_id: Optional[int] = None # Adicionado para bater com o novo model
     historico_evolucao: List[EvolucaoResponse] = []
+    
     class Config:
         from_attributes = True
 
-
+# --- FICHAS E EXERCÍCIOS ---
 class ItemExercicioCreate(BaseModel):
     exercicio_referencia_id: int
     series: int
@@ -59,7 +63,7 @@ class ItemExercicioCreate(BaseModel):
 class FichaTreinoCreate(BaseModel):
     aluno_id: int
     titulo: str
-    exercicios: List[ItemExercicioCreate] # Uma lista de exercícios já na criação
+    exercicios: List[ItemExercicioCreate]
 
 class ItemExercicioResponse(BaseModel):
     id: int
@@ -68,11 +72,31 @@ class ItemExercicioResponse(BaseModel):
     repeticoes: int
     carga: float
     observacao: Optional[str]
-    class Config: from_attributes = True
+    
+    class Config: 
+        from_attributes = True
 
 class FichaTreinoResponse(BaseModel):
     id: int
     titulo: str
     status: str
     exercicios: List[ItemExercicioResponse]
-    class Config: from_attributes = True
+    
+    class Config: 
+        from_attributes = True
+
+# --- ROTINAS ---
+class RotinaBase(BaseModel):
+    title: str
+    criado_por_professor: bool = False
+    status: str = "pending"
+
+class RotinaCreate(RotinaBase):
+    pass
+
+class RotinaResponse(RotinaBase): # Renomeado para consistência
+    id: int
+    aluno_id: int
+
+    class Config:
+        from_attributes = True
