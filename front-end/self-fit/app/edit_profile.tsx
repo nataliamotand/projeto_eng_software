@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   SafeAreaView,
   View,
@@ -15,21 +15,36 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../src/components/ui/theme';
 
 const { width } = Dimensions.get('window');
 
-const USER_PROFILE = 'STUDENT';
-
 export default function EditProfile(): JSX.Element {
   const router = useRouter();
 
+  const [userPerfil, setUserPerfil] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [name, setName] = useState('Gabrielli Valelia');
   const [avatarUri, setAvatarUri] = useState<string | number | null>(null);
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
   const [objectives, setObjectives] = useState('Quero ganhar força e melhorar a resistência cardiovascular.');
 
-  
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        const raw = await AsyncStorage.getItem('userPerfil');
+        if (!active) return;
+        setUserPerfil(raw === 'TEACHER' ? 'TEACHER' : 'STUDENT');
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const isStudent = userPerfil === 'STUDENT';
 
   async function takePhoto() {
     try {
@@ -69,7 +84,7 @@ export default function EditProfile(): JSX.Element {
 
   function handleSave() {
     // TODO: persist profile changes
-    console.log('Save', { name, avatarUri, objectives, weight, bodyFat, leanMass });
+    console.log('Save', { name, avatarUri, objectives });
     router.back();
   }
 
@@ -113,7 +128,7 @@ export default function EditProfile(): JSX.Element {
           <TextInput value={name} onChangeText={setName} style={styles.textInput} placeholderTextColor={colors.grayMid} />
         </View>
 
-        {USER_PROFILE === 'STUDENT' && (
+        {isStudent && (
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Meus Objetivos</Text>
             <TextInput

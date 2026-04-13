@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Importações do seu projeto
 import api from '../src/services/api';
+import { parseJwtPayload } from '../src/utils/jwtPayload';
 import { colors } from '../src/components/ui/theme';
 
 const { height, width } = Dimensions.get('window');
@@ -56,9 +57,12 @@ export default function Login(): JSX.Element {
 
       // Se chegamos aqui, o login deu 200 OK
       const token = response.data.access_token;
-      
+
       // Salvamos o token no "HD" do celular para a Home poder usar
       await AsyncStorage.setItem('userToken', token);
+      const payload = parseJwtPayload(token);
+      const perfil = payload?.perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT';
+      await AsyncStorage.setItem('userPerfil', perfil);
       
       console.log('Login OK! Navegando para a Home...');
       router.push('/home');

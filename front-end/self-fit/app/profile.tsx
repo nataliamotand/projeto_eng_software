@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   SafeAreaView,
   View,
@@ -10,10 +10,11 @@ import {
   Dimensions,
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
-import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../src/components/ui/Header';
-import Footer from '../src/components/ui/Footer';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 
@@ -54,6 +55,23 @@ LocaleConfig.defaultLocale = 'pt';
 
 export default function Profile(): JSX.Element {
   const router = useRouter();
+  const [userPerfil, setUserPerfil] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        const raw = await AsyncStorage.getItem('userPerfil');
+        if (!active) return;
+        setUserPerfil(raw === 'TEACHER' ? 'TEACHER' : 'STUDENT');
+      })();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  const isTeacher = userPerfil === 'TEACHER';
 
   const workoutMap = useMemo(() => {
     const m: Record<string, { date: string; title: string }> = {};
@@ -91,77 +109,84 @@ export default function Profile(): JSX.Element {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200, flexGrow: 1 }}>
-        <View style={styles.profileCard}>
+        <View style={[styles.profileCard, isTeacher && styles.profileCardTeacher]}>
           <Image source={USER.avatar} style={styles.avatarLarge} />
           <View style={styles.statsWrap}>
             <Text style={styles.profileName}>{USER.name}</Text>
-            <Text style={styles.profileHandle}>@{USER.username}</Text>
-            <View style={styles.statsRow}>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{USER.trainings}</Text>
-                <Text style={styles.statLabel}>Treinamentos</Text>
-              </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{USER.followers}</Text>
-                <Text style={styles.statLabel}>Seguidores</Text>
-              </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{USER.following}</Text>
-                <Text style={styles.statLabel}>Seguindo</Text>
-              </View>
-            </View>
+            {!isTeacher && (
+              <>
+                <Text style={styles.profileHandle}>@{USER.username}</Text>
+                <View style={styles.statsRow}>
+                  <View style={styles.statCol}>
+                    <Text style={styles.statNumber}>{USER.trainings}</Text>
+                    <Text style={styles.statLabel}>Treinamentos</Text>
+                  </View>
+                  <View style={styles.statCol}>
+                    <Text style={styles.statNumber}>{USER.followers}</Text>
+                    <Text style={styles.statLabel}>Seguidores</Text>
+                  </View>
+                  <View style={styles.statCol}>
+                    <Text style={styles.statNumber}>{USER.following}</Text>
+                    <Text style={styles.statLabel}>Seguindo</Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
-        <View style={styles.calendarWrap}>
-          <Calendar
-            // use transparent background so underlying card shows
-            theme={{
-              backgroundColor: 'transparent',
-              calendarBackground: 'transparent',
-              textSectionTitleColor: colors.white,
-              dayTextColor: colors.white,
-              arrowColor: colors.red,
-              monthTextColor: colors.white,
-              todayTextColor: colors.white,
-            }}
-            dayComponent={renderDay}
-          />
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => { router.push('/calendar'); }}>
-            <View style={styles.actionLeft}>
-              <FontAwesome name="calendar" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Calendário</Text>
+        {!isTeacher && (
+          <>
+            <View style={styles.calendarWrap}>
+              <Calendar
+                theme={{
+                  backgroundColor: 'transparent',
+                  calendarBackground: 'transparent',
+                  textSectionTitleColor: colors.white,
+                  dayTextColor: colors.white,
+                  arrowColor: colors.red,
+                  monthTextColor: colors.white,
+                  todayTextColor: colors.white,
+                }}
+                dayComponent={renderDay}
+              />
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/previous_workouts'); }}>
-            <View style={styles.actionLeft}>
-              <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Treinos</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.actionButton} onPress={() => { router.push('/calendar'); }}>
+                <View style={styles.actionLeft}>
+                  <FontAwesome name="calendar" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Calendário</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/measures'); }}>
-            <View style={styles.actionLeft}>
-              <MaterialIcons name="monitor-weight" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Medições</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/previous_workouts'); }}>
+                <View style={styles.actionLeft}>
+                  <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Treinos</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/metrics'); }}>
-            <View style={styles.actionLeft}>
-              <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Métricas</Text>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/measures'); }}>
+                <View style={styles.actionLeft}>
+                  <MaterialIcons name="monitor-weight" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Medições</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/metrics'); }}>
+                <View style={styles.actionLeft}>
+                  <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Métricas</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
-        </View>
+          </>
+        )}
       </ScrollView>
 
       <StickyFooter active="profile" />
@@ -223,6 +248,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  profileCardTeacher: {
+    paddingTop: 24,
+    paddingBottom: 32,
+    justifyContent: 'center',
+  },
   avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#222' },
   statsWrap: { marginLeft: 16, flex: 1, flexDirection: 'column', alignItems: 'flex-start' },
   profileName: { color: colors.white, fontSize: 18, fontWeight: '800', marginBottom: 6 },
@@ -238,7 +268,6 @@ const styles = StyleSheet.create({
   dayNumber: { color: colors.white, fontSize: 14 },
   dayLabel: { color: colors.lightGray, fontSize: 10, marginTop: 4, textAlign: 'center' },
 
-  actions: { paddingHorizontal: 16, paddingTop: 18 },
   actions: { paddingHorizontal: 16, paddingTop: 32 },
   actionButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkGray, padding: 14, borderRadius: 12, justifyContent: 'space-between' },
   actionLeft: { flexDirection: 'row', alignItems: 'center' },
