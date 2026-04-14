@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,59 +9,100 @@ import {
   TextInput,
   FlatList,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from '../src/components/ui/theme';
+import api from '../src/services/api'; // Certifique-se de que o caminho está correto
 
 const { width } = Dimensions.get('window');
 
-const mockedUsers = [
-  { id: '1', name: 'Mariana Silva', username: 'maris', subtitle: '3 em comum', avatar: require('../assets/images/logo.png') },
-  { id: '2', name: 'Carlos Pereira', username: 'carlosp', subtitle: 'Sugestões para você', avatar: require('../assets/images/react-logo.png') },
-  { id: '3', name: 'Ana Souza', username: 'anas', subtitle: '2 em comum', avatar: require('../assets/images/logo_google.png') },
-  { id: '4', name: 'Pedro Gomes', username: 'pedrog', subtitle: '1 em comum', avatar: require('../assets/images/icon.png') },
-];
+// Interface para tipar o usuário que vem do banco
+interface Usuario {
+  id: number;
+  nome: string;
+  email: string;
+  tipo_perfil: string;
+}
 
-export default function AddFriends(): JSX.Element {
+export default function AddFriends(){
   const [query, setQuery] = useState('');
+  const [users, setUsers] = useState<Usuario[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const filtered = mockedUsers.filter((u) => {
+  // 1. Carregar usuários reais do Back-end
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/usuarios/descobrir');
+      setUsers(response.data);
+    } catch (error: any) {
+      console.error("Erro ao carregar usuários:", error);
+      Alert.alert("Erro", "Não foi possível carregar a lista de usuários.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  // 2. Lógica de Seguir
+  const handleFollow = async (userId: number, userName: string) => {
+    try {
+      await api.post(`/usuarios/seguir/${userId}`);
+      Alert.alert("Sucesso", `Solicitação enviada para ${userName}!`);
+      
+      // Opcional: Remove o usuário da lista após seguir para dar feedback visual
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.detail || "Erro ao seguir usuário.";
+      Alert.alert("Atenção", errorMsg);
+    }
+  };
+
+  // 3. Filtro de busca (Local para performance, ou pode ser via API)
+  const filtered = users.filter((u) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    return u.name.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+    return u.nome.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
   });
 
-  function renderUser({ item }: { item: typeof mockedUsers[0] }) {
+  function renderUser({ item }: { item: Usuario }) {
     return (
       <View style={styles.userRow}>
         <View style={styles.userLeft}>
-          <Image source={item.avatar} style={styles.avatar} />
+          {/* Usando um placeholder caso não tenha imagem no banco ainda */}
+          <Image 
+            source={require('../assets/images/logo.png')} 
+            style={styles.avatar} 
+          />
           <View style={styles.userTexts}>
-            <Text style={styles.userName}>{item.name}</Text>
-              <Text style={styles.userLogin}>@{item.username}</Text>
+            <Text style={styles.userName}>{item.nome}</Text>
+            <Text style={styles.userLogin}>{item.email}</Text>
+            
             <View style={styles.subtitleRow}>
-              <Text style={styles.userSubtitle}>{item.subtitle}</Text>
-              {/* overlapping mini avatars (bonus) */}
+              <Text style={styles.userSubtitle}>Sugestão para você</Text>
               <View style={styles.miniAvatars}>
                 <Image source={require('../assets/images/react-logo.png')} style={[styles.miniAvatar, { left: 0 }]} />
-                <Image source={require('../assets/images/logo.png')} style={[styles.miniAvatar, { left: 10 }]} />
+                <Image source={require('../assets/images/icon.png')} style={[styles.miniAvatar, { left: 10 }]} />
               </View>
             </View>
           </View>
         </View>
 
-          <View style={styles.userRight}>
-            <TouchableOpacity
-              style={styles.followButton}
-              onPress={() => {
-                // TODO: Implementar ação de seguir/adicionar
-              }}
-            >
-              <Text style={styles.followText}>Seguir</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.userRight}>
+          <TouchableOpacity
+            style={styles.followButton}
+            onPress={() => handleFollow(item.id, item.nome)}
+          >
+            <Text style={styles.followText}>Seguir</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -69,24 +110,18 @@ export default function AddFriends(): JSX.Element {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => {
-            router.back();
-          }}
-          style={styles.backTouch}
-        >
+        <TouchableOpacity onPress={() => router.back()} style={styles.backTouch}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
 
         <Text style={styles.title}>Encontrar pessoas</Text>
-
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.searchWrap}>
         <Ionicons name="search" size={18} color={colors.grayText} style={{ marginLeft: 12 }} />
         <TextInput
-            placeholder="Buscar"
+          placeholder="Buscar"
           placeholderTextColor={colors.grayText}
           value={query}
           onChangeText={setQuery}
@@ -94,13 +129,20 @@ export default function AddFriends(): JSX.Element {
         />
       </View>
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(i) => i.id}
-        renderItem={renderUser}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.red} style={{ marginTop: 20 }} />
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(i) => i.id.toString()}
+          renderItem={renderUser}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>Nenhum usuário encontrado.</Text>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -132,10 +174,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
 
-  list: {
-    paddingHorizontal: 12,
-    paddingBottom: 24,
-  },
+  list: { paddingHorizontal: 12, paddingBottom: 24 },
+  emptyText: { color: colors.grayText, textAlign: 'center', marginTop: 20 },
 
   userRow: {
     flexDirection: 'row',
@@ -157,5 +197,4 @@ const styles = StyleSheet.create({
   userRight: { flexDirection: 'row', alignItems: 'center' },
   followButton: { backgroundColor: colors.red, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   followText: { color: colors.white, fontWeight: '700' },
-  closeTouch: { marginLeft: 10, padding: 6 },
 });
