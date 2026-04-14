@@ -14,14 +14,16 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     tipo_perfil: str
-    class Config: from_attributes = True
+    class Config: from_attributes = True 
 
+# --- PERFIS ---
 class ProfessorCreate(BaseModel):
     cref: str
 
 class AlunoCreate(BaseModel):
     objetivo: str
 
+# --- EVOLUÇÃO ---
 class EvolucaoCreate(BaseModel):
     peso: float
     porcentagem_gordura: Optional[float] = None
@@ -35,6 +37,15 @@ class EvolucaoResponse(BaseModel):
     massa_muscular: Optional[float]
     class Config: from_attributes = True
 
+# --- ALUNO COMPLETO ---
+class AlunoResponse(BaseModel):
+    id: int
+    objetivo: str
+    professor_id: Optional[int] = None
+    historico_evolucao: List[EvolucaoResponse] = []
+    class Config: from_attributes = True
+
+# --- FICHAS E EXERCÍCIOS ---
 class ItemExercicioCreate(BaseModel):
     exercicio_referencia_id: int
     series: int
@@ -60,10 +71,25 @@ class FichaTreinoResponse(BaseModel):
     id: int
     titulo: str
     status: str
-    criado_por_professor: bool
+    criado_por_professor: bool # Integrado do código dela
     exercicios: List[ItemExercicioResponse]
     class Config: from_attributes = True
 
+# --- ROTINAS (Sua estrutura original preservada) ---
+class RotinaBase(BaseModel):
+    title: str
+    criado_por_professor: bool = False
+    status: str = "pending"
+
+class RotinaCreate(RotinaBase):
+    pass
+
+class RotinaResponse(RotinaBase): 
+    id: int
+    aluno_id: int
+    class Config: from_attributes = True
+
+# --- NOTIFICAÇÕES E SOCIAL (Novos da Natália) ---
 class NotificacaoResponse(BaseModel):
     id: int
     titulo: str
@@ -74,3 +100,6 @@ class NotificacaoResponse(BaseModel):
     remetente_id: Optional[int]
     referencia_id: Optional[int]
     class Config: from_attributes = True
+
+class RespostaNotificacao(BaseModel):
+    acao: str # 'ACEITAR' ou 'RECUSAR'
