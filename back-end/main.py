@@ -80,14 +80,16 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 
 @app.get("/notificacoes", response_model=List[schemas.NotificacaoResponse])
 def listar_notificacoes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    notifs = db.query(models.Notificacao).filter(models.Notificacao.destinatario_id == u.id).all()
-    # Marca como lido notificações informativas
-    for n in notifs:
-        if n.tipo in ['VINCULO_PROFESSOR', 'NOVA_ROTINA'] and n.status == 'PENDENTE':
-            n.status = 'LIDO'
-    db.commit()
-    return notifs
+    user = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # Adicionamos o filtro para trazer apenas o status 'PENDENTE'
+    # Assim, quando você aceita (status vira 'ACEITO'), ela some do GET
+    notificacoes = db.query(models.Notificacao).filter(
+        models.Notificacao.destinatario_id == user.id,
+        models.Notificacao.status == "PENDENTE" 
+    ).order_by(models.Notificacao.data_criacao.desc()).all()
+    
+    return notificacoes
 
 @app.put("/notificacoes/{notificacao_id}/responder")
 def responder_notificacao(notificacao_id: int, dados: schemas.RespostaNotificacao, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
@@ -218,3 +220,17 @@ def vincular(professor_id: int, email: str = Depends(auth.obter_usuario_atual), 
     u.perfil_aluno.professor_id = p.id
     disparar_notificacao(db, p.usuario_id, u.id, "Novo Aluno", f"{u.nome} vinculou-se a você.", "VINCULO_PROFESSOR")
     db.commit(); return {"mensagem": "Vinculado!"}
+
+@app.get("/usuarios/descobrir", response_model=List[schemas.UsuarioResponse])
+def listar_usuarios_para_seguir(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # Busca todos os usuários que:
+    # 1. Não sejam eu mesmo
+    # 2. Sejam do tipo 'STUDENT' (conforme a regra que definimos)
+    usuarios = db.query(models.Usuario).filter(
+        models.Usuario.id != meu_u.id,
+        models.Usuario.tipo_perfil == "STUDENT"
+    ).all()
+    
+    return usuarios
