@@ -27,6 +27,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [userData, setUserData] = useState({ nome: '', handle: '' });
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   
   useEffect(() => {
@@ -34,13 +35,14 @@ export default function Home() {
       try {
         setLoading(true);
         const userRes = await api.get('/usuarios/me');
-        const { nome, tipo_perfil } = userRes.data;
+        const { nome, tipo_perfil, foto_perfil } = userRes.data;
         
         setUserData({ 
           nome, 
           handle: `@${nome.toLowerCase().replace(/\s/g, '')}` 
         });
         setUserProfile(tipo_perfil);
+        setAvatarUri(foto_perfil ? String(foto_perfil) : null);
 
         const endpoint = tipo_perfil === 'TEACHER' ? '/professor/feed-alunos' : '/aluno/feed-amigos';
         const feedRes = await api.get(endpoint);
@@ -70,7 +72,7 @@ export default function Home() {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
-            <Image source={require('../assets/images/logo.png')} style={styles.avatarImage} />
+            <Image source={avatarUri ? { uri: avatarUri } : require('../assets/images/logo.png')} style={styles.avatarImage} />
           </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName}>{userData.nome}</Text>

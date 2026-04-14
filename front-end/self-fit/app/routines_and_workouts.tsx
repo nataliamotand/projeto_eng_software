@@ -25,13 +25,18 @@ const { width } = Dimensions.get('window');
 // 1. COMPONENTE DE HEADER DINÂMICO
 function Header({ user }: { user: any }) {
   const router = useRouter();
+  const avatarUri = user?.foto_perfil ? String(user.foto_perfil) : null;
 
   return (
     <View style={styles.header}>
       <View style={styles.headerDetail} pointerEvents="none" />
       <View style={styles.headerLeft}>
         <View style={styles.avatar}>
-          <Image source={require('../assets/images/logo.png')} style={styles.avatarImage} resizeMode="contain" />
+          <Image
+            source={avatarUri ? { uri: avatarUri } : require('../assets/images/logo.png')}
+            style={styles.avatarImage}
+            resizeMode="contain"
+          />
         </View>
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{user?.nome || 'Carregando...'}</Text>
