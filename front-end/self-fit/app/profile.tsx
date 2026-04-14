@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -8,28 +8,25 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
-import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import Header from '../src/components/ui/Header';
-import Footer from '../src/components/ui/Footer';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
+import api from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
-// MOCKED DATA
-const USER = {
-  name: 'Gabrielli Valelia',
-  username: 'valeliagabi',
-  avatar: require('../assets/images/logo.png'),
+// Dados mockados só para estatísticas / calendário do aluno
+const MOCK_STATS = {
   trainings: 42,
   followers: 1240,
   following: 186,
 };
 
-// generate a few workout days in current month
 const now = new Date();
 const year = now.getFullYear();
 const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -42,7 +39,6 @@ const workoutDays = [
   { date: `${year}-${month}-22`, title: 'Core' },
 ];
 
-// Configure calendar locale to Portuguese
 LocaleConfig.locales['pt'] = {
   monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
   monthNamesShort: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
@@ -52,8 +48,44 @@ LocaleConfig.locales['pt'] = {
 };
 LocaleConfig.defaultLocale = 'pt';
 
-export default function Profile(): JSX.Element {
+const defaultAvatar = require('../assets/images/logo.png');
+
+function buildHandle(nome: string): string {
+  return nome.toLowerCase().replace(/\s/g, '');
+}
+
+export default function Profile() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
+  const [nome, setNome] = useState('');
+  const [handle, setHandle] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await api.get('/usuarios/me');
+        if (cancelled) return;
+        const { nome: n, tipo_perfil, email } = res.data;
+        setNome(n);
+        setUserProfile(tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
+        setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
+      } catch (e) {
+        if (!cancelled) setError('Não foi possível carregar o perfil.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isTeacher = userProfile === 'TEACHER';
 
   const workoutMap = useMemo(() => {
     const m: Record<string, { date: string; title: string }> = {};
@@ -80,6 +112,29 @@ export default function Profile(): JSX.Element {
     );
   }
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <Header title="Perfil" />
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.red} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <Header title="Perfil" />
+        <View style={styles.centered}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+        <StickyFooter active="profile" userProfile={userProfile} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <Header title="Perfil" />
@@ -91,86 +146,93 @@ export default function Profile(): JSX.Element {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200, flexGrow: 1 }}>
-        <View style={styles.profileCard}>
-          <Image source={USER.avatar} style={styles.avatarLarge} />
+        <View style={[styles.profileCard, isTeacher && styles.profileCardTeacher]}>
+          <Image source={defaultAvatar} style={styles.avatarLarge} />
           <View style={styles.statsWrap}>
-            <Text style={styles.profileName}>{USER.name}</Text>
-            <Text style={styles.profileHandle}>@{USER.username}</Text>
-            <View style={styles.statsRow}>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{USER.trainings}</Text>
-                <Text style={styles.statLabel}>Treinamentos</Text>
+            <Text style={styles.profileName}>{nome || '—'}</Text>
+            <Text style={styles.profileHandle}>{handle}</Text>
+            {!isTeacher && (
+              <View style={styles.statsRow}>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{MOCK_STATS.trainings}</Text>
+                  <Text style={styles.statLabel}>Treinamentos</Text>
+                </View>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{MOCK_STATS.followers}</Text>
+                  <Text style={styles.statLabel}>Seguidores</Text>
+                </View>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{MOCK_STATS.following}</Text>
+                  <Text style={styles.statLabel}>Seguindo</Text>
+                </View>
               </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{USER.followers}</Text>
-                <Text style={styles.statLabel}>Seguidores</Text>
-              </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{USER.following}</Text>
-                <Text style={styles.statLabel}>Seguindo</Text>
-              </View>
-            </View>
+            )}
           </View>
         </View>
 
-        <View style={styles.calendarWrap}>
-          <Calendar
-            // use transparent background so underlying card shows
-            theme={{
-              backgroundColor: 'transparent',
-              calendarBackground: 'transparent',
-              textSectionTitleColor: colors.white,
-              dayTextColor: colors.white,
-              arrowColor: colors.red,
-              monthTextColor: colors.white,
-              todayTextColor: colors.white,
-            }}
-            dayComponent={renderDay}
-          />
-        </View>
-
-        <View style={styles.actions}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => { router.push('/calendar'); }}>
-            <View style={styles.actionLeft}>
-              <FontAwesome name="calendar" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Calendário</Text>
+        {!isTeacher && (
+          <>
+            <View style={styles.calendarWrap}>
+              <Calendar
+                theme={{
+                  backgroundColor: 'transparent',
+                  calendarBackground: 'transparent',
+                  textSectionTitleColor: colors.white,
+                  dayTextColor: colors.white,
+                  arrowColor: colors.red,
+                  monthTextColor: colors.white,
+                  todayTextColor: colors.white,
+                }}
+                dayComponent={renderDay}
+              />
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/previous_workouts'); }}>
-            <View style={styles.actionLeft}>
-              <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Treinos</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.actionButton} onPress={() => { router.push('/calendar'); }}>
+                <View style={styles.actionLeft}>
+                  <FontAwesome name="calendar" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Calendário</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/measures'); }}>
-            <View style={styles.actionLeft}>
-              <MaterialIcons name="monitor-weight" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Medições</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/previous_workouts'); }}>
+                <View style={styles.actionLeft}>
+                  <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Treinos</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/metrics'); }}>
-            <View style={styles.actionLeft}>
-              <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
-              <Text style={styles.actionText}>Métricas</Text>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/measures'); }}>
+                <View style={styles.actionLeft}>
+                  <MaterialIcons name="monitor-weight" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Medições</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/metrics'); }}>
+                <View style={styles.actionLeft}>
+                  <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
+                  <Text style={styles.actionText}>Métricas</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
-        </View>
+          </>
+        )}
       </ScrollView>
 
-      <StickyFooter active="profile" />
+      <StickyFooter active="profile" userProfile={userProfile} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  errorText: { color: colors.lightGray, textAlign: 'center' },
   header: {
     backgroundColor: colors.darkRed,
     paddingHorizontal: 16,
@@ -223,6 +285,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  profileCardTeacher: {
+    paddingTop: 28,
+    paddingBottom: 28,
+  },
   avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#222' },
   statsWrap: { marginLeft: 16, flex: 1, flexDirection: 'column', alignItems: 'flex-start' },
   profileName: { color: colors.white, fontSize: 18, fontWeight: '800', marginBottom: 6 },
@@ -238,7 +304,6 @@ const styles = StyleSheet.create({
   dayNumber: { color: colors.white, fontSize: 14 },
   dayLabel: { color: colors.lightGray, fontSize: 10, marginTop: 4, textAlign: 'center' },
 
-  actions: { paddingHorizontal: 16, paddingTop: 18 },
   actions: { paddingHorizontal: 16, paddingTop: 32 },
   actionButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkGray, padding: 14, borderRadius: 12, justifyContent: 'space-between' },
   actionLeft: { flexDirection: 'row', alignItems: 'center' },

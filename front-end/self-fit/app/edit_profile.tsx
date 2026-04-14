@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -16,20 +16,37 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { colors } from '../src/components/ui/theme';
+import api from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
-const USER_PROFILE = 'STUDENT';
-
-export default function EditProfile(): JSX.Element {
+export default function EditProfile() {
   const router = useRouter();
 
-  const [name, setName] = useState('Gabrielli Valelia');
+  const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER' | null>(null);
+  const [name, setName] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | number | null>(null);
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
   const [objectives, setObjectives] = useState('Quero ganhar força e melhorar a resistência cardiovascular.');
 
-  
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/usuarios/me');
+        if (cancelled) return;
+        setUserProfile(res.data.tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
+        if (res.data.nome) setName(res.data.nome);
+      } catch {
+        /* mantém defaults locais */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+   const showObjectives = userProfile === 'STUDENT';
 
   async function takePhoto() {
     try {
@@ -69,7 +86,7 @@ export default function EditProfile(): JSX.Element {
 
   function handleSave() {
     // TODO: persist profile changes
-    console.log('Save', { name, avatarUri, objectives, weight, bodyFat, leanMass });
+    console.log('Save', { name, avatarUri, objectives: showObjectives ? objectives : undefined });
     router.back();
   }
 
@@ -113,7 +130,7 @@ export default function EditProfile(): JSX.Element {
           <TextInput value={name} onChangeText={setName} style={styles.textInput} placeholderTextColor={colors.grayMid} />
         </View>
 
-        {USER_PROFILE === 'STUDENT' && (
+        {showObjectives && (
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>Meus Objetivos</Text>
             <TextInput
