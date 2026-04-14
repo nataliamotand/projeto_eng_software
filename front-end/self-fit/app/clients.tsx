@@ -258,7 +258,7 @@ export default function Clients(): JSX.Element {
         </View>
       </View>
 
-      <StickyFooter active="clients" />
+      <StickyFooter active="clients" userProfile="TEACHER" />
     </SafeAreaView>
   );
 }

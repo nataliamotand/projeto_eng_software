@@ -11,6 +11,8 @@ import {
   Dimensions,
   Modal,
   Pressable,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -27,7 +29,8 @@ export default function EditProfile() {
   const [name, setName] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | number | null>(null);
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
-  const [objectives, setObjectives] = useState('Quero ganhar força e melhorar a resistência cardiovascular.');
+  const [objectives, setObjectives] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,8 +38,20 @@ export default function EditProfile() {
       try {
         const res = await api.get('/usuarios/me');
         if (cancelled) return;
-        setUserProfile(res.data.tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
+        const perfil = res.data.tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT';
+        setUserProfile(perfil);
         if (res.data.nome) setName(res.data.nome);
+        if (res.data.foto_perfil) setAvatarUri(String(res.data.foto_perfil));
+        if (perfil === 'STUDENT') {
+          try {
+            const alunoRes = await api.get('/alunos/me');
+            if (!cancelled && alunoRes.data?.objetivo != null) {
+              setObjectives(String(alunoRes.data.objetivo));
+            }
+          } catch {
+            /* aluno sem linha ainda ou erro de rede */
+          }
+        }
       } catch {
         /* mantém defaults locais */
       }
@@ -46,7 +61,7 @@ export default function EditProfile() {
     };
   }, []);
 
-   const showObjectives = userProfile === 'STUDENT';
+  const showObjectives = userProfile === 'STUDENT';
 
   async function takePhoto() {
     try {
@@ -84,10 +99,32 @@ export default function EditProfile() {
     setAvatarUri(null);
   }
 
-  function handleSave() {
-    // TODO: persist profile changes
-    console.log('Save', { name, avatarUri, objectives: showObjectives ? objectives : undefined });
-    router.back();
+  async function handleSave() {
+    const nomeTrim = name.trim();
+    if (nomeTrim.length < 2) {
+      Alert.alert('Nome inválido', 'Informe um nome com pelo menos 2 caracteres.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.put('/usuarios/me', {
+        nome: nomeTrim,
+        foto_perfil: typeof avatarUri === 'string' ? avatarUri : null,
+      });
+      if (userProfile === 'STUDENT') {
+        await api.put('/alunos/me/objetivo', { objetivo: objectives.trim() });
+      }
+      router.back();
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.detail ??
+        (typeof err?.response?.data === 'string' ? err.response.data : null) ??
+        'Não foi possível salvar. Verifique a conexão e se você está logado.';
+      const detail = Array.isArray(msg) ? msg.map((m: { msg?: string }) => m?.msg || JSON.stringify(m)).join('\n') : String(msg);
+      Alert.alert('Erro ao salvar', detail);
+    } finally {
+      setSaving(false);
+    }
   }
 
   
@@ -101,8 +138,12 @@ export default function EditProfile() {
 
         <Text style={styles.headerTitle}>Editar Perfil</Text>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveText}>Salvar</Text>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator color={colors.white} size="small" />
+          ) : (
+            <Text style={styles.saveText}>Salvar</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -127,7 +168,14 @@ export default function EditProfile() {
 
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Nome Completo</Text>
-          <TextInput value={name} onChangeText={setName} style={styles.textInput} placeholderTextColor={colors.grayMid} />
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            style={styles.textInput}
+            placeholderTextColor={colors.grayMid}
+            placeholder="Seu nome completo"
+            editable={!saving}
+          />
         </View>
 
         {showObjectives && (
@@ -138,9 +186,11 @@ export default function EditProfile() {
               onChangeText={setObjectives}
               style={[styles.textInput, styles.multiInput]}
               placeholderTextColor={colors.grayMid}
+              placeholder="Ex.: hipertrofia, emagrecimento..."
               multiline
               numberOfLines={3}
               textAlignVertical="top"
+              editable={!saving}
             />
           </View>
         )}

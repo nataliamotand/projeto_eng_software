@@ -10,7 +10,8 @@ class Usuario(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     senha = Column(String, nullable=False)
     data_nascimento = Column(Date, nullable=False)
-    tipo_perfil = Column(String, nullable=False) 
+    tipo_perfil = Column(String, nullable=False)
+    foto_perfil = Column(String, nullable=True)
 
     # Relacionamentos de Perfil
     perfil_aluno = relationship("Aluno", back_populates="usuario", uselist=False)

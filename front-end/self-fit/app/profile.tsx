@@ -61,6 +61,7 @@ export default function Profile() {
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [nome, setNome] = useState('');
   const [handle, setHandle] = useState('');
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,10 +71,11 @@ export default function Profile() {
         setError(null);
         const res = await api.get('/usuarios/me');
         if (cancelled) return;
-        const { nome: n, tipo_perfil, email } = res.data;
+        const { nome: n, tipo_perfil, email, foto_perfil } = res.data;
         setNome(n);
         setUserProfile(tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
         setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
+        setAvatarUri(foto_perfil ? String(foto_perfil) : null);
       } catch (e) {
         if (!cancelled) setError('Não foi possível carregar o perfil.');
       } finally {
@@ -147,7 +149,7 @@ export default function Profile() {
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200, flexGrow: 1 }}>
         <View style={[styles.profileCard, isTeacher && styles.profileCardTeacher]}>
-          <Image source={defaultAvatar} style={styles.avatarLarge} />
+          <Image source={avatarUri ? { uri: avatarUri } : defaultAvatar} style={styles.avatarLarge} />
           <View style={styles.statsWrap}>
             <Text style={styles.profileName}>{nome || '—'}</Text>
             <Text style={styles.profileHandle}>{handle}</Text>

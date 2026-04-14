@@ -14,7 +14,18 @@ class UsuarioResponse(BaseModel):
     nome: str
     email: str
     tipo_perfil: str
-    class Config: from_attributes = True 
+    foto_perfil: Optional[str] = None
+    class Config: from_attributes = True
+
+class UsuarioPerfilUpdate(BaseModel):
+    nome: str
+    foto_perfil: Optional[str] = None
+
+class AlunoObjetivoRead(BaseModel):
+    objetivo: Optional[str] = None
+
+class AlunoObjetivoUpdate(BaseModel):
+    objetivo: str
 
 # --- PERFIS ---
 class ProfessorCreate(BaseModel):

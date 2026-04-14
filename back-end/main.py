@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional
 from database import SessionLocal, engine
 from datetime import date
@@ -9,6 +10,8 @@ import models, schemas, auth
 
 # Garante a criação de todas as tabelas (incluindo as novas da Natália e sua Rotina)
 models.Base.metadata.create_all(bind=engine)
+with engine.begin() as conn:
+    conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS foto_perfil VARCHAR"))
 
 app = FastAPI(title="API Self-Fit")
 
@@ -70,6 +73,58 @@ def ler_usuario_atual(email: str = Depends(auth.obter_usuario_atual), db: Sessio
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     return usuario
+
+@app.put("/usuarios/me", response_model=schemas.UsuarioResponse)
+def atualizar_nome_usuario_atual(
+    dados: schemas.UsuarioPerfilUpdate,
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db),
+):
+    nome = (dados.nome or "").strip()
+    if len(nome) < 2:
+        raise HTTPException(status_code=400, detail="Nome deve ter pelo menos 2 caracteres.")
+    usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not usuario:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    usuario.nome = nome
+    usuario.foto_perfil = dados.foto_perfil
+    db.commit()
+    db.refresh(usuario)
+    return usuario
+
+@app.get("/alunos/me", response_model=schemas.AlunoObjetivoRead)
+def ler_objetivo_aluno_atual(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if u.tipo_perfil != "STUDENT":
+        raise HTTPException(status_code=403, detail="Apenas alunos possuem objetivos.")
+    if not u.perfil_aluno:
+        return schemas.AlunoObjetivoRead(objetivo=None)
+    return schemas.AlunoObjetivoRead(objetivo=u.perfil_aluno.objetivo)
+
+@app.put("/alunos/me/objetivo", response_model=schemas.AlunoObjetivoRead)
+def atualizar_objetivo_aluno_atual(
+    dados: schemas.AlunoObjetivoUpdate,
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db),
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if u.tipo_perfil != "STUDENT":
+        raise HTTPException(status_code=403, detail="Apenas alunos possuem objetivos.")
+    objetivo = (dados.objetivo or "").strip()
+    if not u.perfil_aluno:
+        novo = models.Aluno(usuario_id=u.id, objetivo=objetivo or "")
+        db.add(novo)
+        db.commit()
+        db.refresh(novo)
+        return schemas.AlunoObjetivoRead(objetivo=novo.objetivo)
+    u.perfil_aluno.objetivo = objetivo
+    db.commit()
+    db.refresh(u.perfil_aluno)
+    return schemas.AlunoObjetivoRead(objetivo=u.perfil_aluno.objetivo)
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
