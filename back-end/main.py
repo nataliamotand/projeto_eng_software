@@ -45,6 +45,10 @@ def disparar_notificacao(db: Session, dest_id: int, rem_id: Optional[int], titul
     nova = models.Notificacao(destinatario_id=dest_id, remetente_id=rem_id, titulo=titulo, mensagem=msg, tipo=tipo, referencia_id=ref_id)
     db.add(nova)
 
+@app.get("/")
+def home():
+    return {"status": "Self-Fit API está online!", "docs": "/docs"}
+
 # --- USUÁRIOS E LOGIN ---
 @app.post("/usuarios", response_model=schemas.UsuarioResponse)
 def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
