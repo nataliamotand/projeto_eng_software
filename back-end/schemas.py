@@ -34,6 +34,14 @@ class ProfessorCreate(BaseModel):
 class AlunoCreate(BaseModel):
     objetivo: str
 
+class AlunoMeResponse(BaseModel):
+    id: int
+    objetivo: Optional[str] = None
+    professor_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
 # --- EVOLUÇÃO ---
 class EvolucaoCreate(BaseModel):
     peso: float

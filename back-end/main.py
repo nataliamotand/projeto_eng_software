@@ -78,6 +78,33 @@ def criar_perfil_aluno(perfil: schemas.AlunoCreate, email: str = Depends(auth.ob
     db_a = models.Aluno(usuario_id=u.id, objetivo=perfil.objetivo)
     db.add(db_a); db.commit(); db.refresh(db_a); return db_a
 
+@app.get("/alunos/me", response_model=schemas.AlunoMeResponse)
+def ler_perfil_aluno_me(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if u.tipo_perfil != "STUDENT" or not u.perfil_aluno:
+        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
+    return u.perfil_aluno
+
+@app.put("/alunos/me/objetivo", response_model=schemas.AlunoMeResponse)
+def atualizar_objetivo_aluno_me(
+    dados: schemas.AlunoObjetivoUpdate,
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db),
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if u.tipo_perfil != "STUDENT":
+        raise HTTPException(status_code=403, detail="Apenas alunos podem atualizar o objetivo.")
+    if not u.perfil_aluno:
+        novo = models.Aluno(usuario_id=u.id, objetivo=dados.objetivo)
+        db.add(novo)
+        db.commit()
+        db.refresh(novo)
+        return novo
+    u.perfil_aluno.objetivo = dados.objetivo
+    db.commit()
+    db.refresh(u.perfil_aluno)
+    return u.perfil_aluno
+
 @app.get("/alunos/minhas-rotinas", response_model=List[schemas.RotinaResponse])
 def listar_rotinas(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()

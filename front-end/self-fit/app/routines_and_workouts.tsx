@@ -25,7 +25,9 @@ const { width } = Dimensions.get('window');
 // 1. COMPONENTE DE HEADER DINÂMICO
 function Header({ user }: { user: any }) {
   const router = useRouter();
-  const avatarUri = user?.foto_perfil ? String(user.foto_perfil) : null;
+  const raw = user?.foto_perfil;
+  const avatarUri =
+    typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null;
 
   return (
     <View style={styles.header}>
@@ -35,7 +37,6 @@ function Header({ user }: { user: any }) {
           <Image
             source={avatarUri ? { uri: avatarUri } : require('../assets/images/logo.png')}
             style={styles.avatarImage}
-            resizeMode="contain"
           />
         </View>
         <View style={styles.userInfo}>
@@ -251,11 +252,10 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
     marginRight: 12,
   },
-  avatarImage: { width: 40, height: 24 },
+  avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   userInfo: { flexDirection: 'column' },
   userName: { color: colors.white, fontSize: 16, fontWeight: '700' },
   userHandle: { color: colors.white, fontSize: 12, marginTop: 2 },
