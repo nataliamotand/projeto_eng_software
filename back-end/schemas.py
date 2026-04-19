@@ -118,3 +118,11 @@ class FeedItem(BaseModel):
     
     class Config:
         from_attributes = True
+
+class DashboardMetrics(BaseModel):
+    labels: List[str]  # Datas formatadas: ["10/04", "12/04"...]
+    pesos: List[float]
+    gordura: List[float]
+    musculo: List[float]
+    frequencia_semanal: List[int] # [0, 1, 0, 1, 1, 0, 0] para os dias da semana
+    resumo: dict # {"peso_atual": 80.0, "evolucao": -2.5}

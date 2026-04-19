@@ -8,6 +8,7 @@ from datetime import date
 import models, schemas, auth
 from datetime import datetime
 from sqlalchemy import func
+from datetime import timedelta
 
 # Garante a criação de todas as tabelas (incluindo as novas da Natália e sua Rotina)
 models.Base.metadata.create_all(bind=engine)
@@ -297,3 +298,43 @@ def contar_notificacoes_pendentes(email: str = Depends(auth.obter_usuario_atual)
         models.Notificacao.status == "PENDENTE"
     ).count()
     return {"contagem": total}
+
+
+@app.get("/alunos/dashboard-metrics", response_model=schemas.DashboardMetrics)
+def obter_metricas_dashboard(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    historico = db.query(models.Evolucao).filter(
+        models.Evolucao.aluno_id == u.perfil_aluno.id
+    ).order_by(models.Evolucao.data_registro.asc()).all()
+
+    # Data Science: Transformando as linhas do banco em colunas para os gráficos
+    labels = [h.data_registro.strftime("%d/%m") for h in historico]
+    pesos = [h.peso for h in historico]
+    gordura = [h.porcentagem_gordura for h in historico]
+    musculo = [h.massa_muscular for h in historico]
+
+    # Lógica de Frequência (Exemplo: treinos nos últimos 7 dias)
+    # Aqui poderíamos contar quantos registros houve em cada dia da semana
+    frequencia = [1 if any(h.data_registro.date() == (date.today() - timedelta(days=i)) for h in historico) else 0 for i in range(6, -1, -1)]
+
+    # Cálculo de insights (Data Science aplicada ao treino)
+    total_perda = round(pesos[0] - pesos[-1], 1) if len(pesos) > 1 else 0
+    # Simulando um streak baseado nos registros das últimas 2 semanas
+    streak = sum(1 for h in historico if h.data_registro >= datetime.now() - timedelta(days=7))
+
+    resumo = {
+        "peso_atual": pesos[-1] if pesos else 0,
+        "perda_total": total_perda,
+        "streak": streak,
+        "status_evolucao": "EM QUEDA" if total_perda > 0 else "MANUTENÇÃO",
+        "objetivo_atingido": 65 # Porcentagem fictícia do progresso
+    }
+
+    return {
+        "labels": labels,
+        "pesos": pesos,
+        "gordura": gordura,
+        "musculo": musculo,
+        "frequencia_semanal": frequencia,
+        "resumo": resumo
+    }
