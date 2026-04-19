@@ -15,11 +15,32 @@ import { useRouter } from 'expo-router';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api';
-
-// IMPORTAÇÕES NOVAS
-import NotificationButton from '../src/components/ui/NotificationButton'; // O componente que criamos
+import NotificationButton from '../src/components/ui/NotificationButton';
 
 const { width } = Dimensions.get('window');
+
+function formatarTempoRelativo(dataIso: string) {
+  if (!dataIso) return 'Agora';
+  
+  const agora = new Date();
+  const dataPost = new Date(dataIso);
+
+  // Calcula a diferença em milissegundos
+  const diffInMs = agora.getTime() - dataPost.getTime();
+  const diffEmSegundos = Math.floor(diffInMs / 1000);
+
+  // Se a diferença for negativa (por causa de fuso horário), assume que foi agora
+  if (diffEmSegundos < 60) return 'Agora mesmo';
+  
+  const diffEmMinutos = Math.floor(diffEmSegundos / 60);
+  if (diffEmMinutos < 60) return `há ${diffEmMinutos} min`;
+  
+  const diffEmHoras = Math.floor(diffEmMinutos / 60);
+  if (diffEmHoras < 24) return `há ${diffEmHoras} h`;
+  
+  const diffEmDias = Math.floor(diffEmHoras / 24);
+  return `há ${diffEmDias} dias`;
+}
 
 export default function Home() {
   const router = useRouter();
@@ -30,10 +51,15 @@ export default function Home() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
   
+  // NOVO ESTADO: Para a bolinha de notificações
+  const [notificacoesAtivas, setNotificacoesAtivas] = useState(0);
+  
   useEffect(() => {
     async function syncHome() {
       try {
         setLoading(true);
+        
+        // 1. Busca dados do usuário logado
         const userRes = await api.get('/usuarios/me');
         const { nome, tipo_perfil, foto_perfil } = userRes.data;
         
@@ -44,6 +70,15 @@ export default function Home() {
         setUserProfile(tipo_perfil);
         setAvatarUri(foto_perfil ? String(foto_perfil) : null);
 
+        // 2. BUSCA CONTAGEM DE NOTIFICAÇÕES (Nova Funcionalidade)
+        try {
+            const countRes = await api.get('/notificacoes/contagem');
+            setNotificacoesAtivas(countRes.data.contagem);
+        } catch (e) {
+            console.log("Erro ao buscar contagem de notificações");
+        }
+
+        // 3. Busca o Feed
         const endpoint = tipo_perfil === 'TEACHER' ? '/professor/feed-alunos' : '/aluno/feed-amigos';
         const feedRes = await api.get(endpoint);
         setFeedPosts(feedRes.data);
@@ -68,7 +103,7 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* HEADER DINÂMICO REVISADO */}
+      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
@@ -81,18 +116,16 @@ export default function Home() {
         </View>
 
         <View style={styles.headerRight}>
-          {/* REGRA: Só Aluno vê botão de adicionar amigo */}
           {userProfile === 'STUDENT' && (
             <TouchableOpacity 
               onPress={() => router.push('/add_friends')}
-              style={{ marginRight: 15 }} // Espaçamento entre os ícones
+              style={{ marginRight: 15 }}
             >
               <FontAwesome name="user-plus" size={20} color={colors.white} />
             </TouchableOpacity>
           )}
-
-          {/* O BOTÃO COM A BOLINHA ENTRA AQUI */}
-          <NotificationButton />
+          {/* PASSO 4: Passando a quantidade para o botão disparar a bolinha vermelha */}
+          <NotificationButton quantidade={notificacoesAtivas} />
         </View>
       </View>
 
@@ -113,13 +146,16 @@ export default function Home() {
           renderItem={({ item }) => (
             <View style={styles.postCard}>
               <View style={styles.postHeader}>
-                <Text style={styles.postAuthor}>{item.authorName}</Text>
-                <Text style={styles.postTime}>{item.timeAgo || 'Agora'}</Text>
+                <Text style={styles.postAuthor}>{item.usuario_nome}</Text>
+                {/* PASSO 5: Substituído "Agora" pela função de tempo real */}
+                <Text style={styles.postTime}>{formatarTempoRelativo(item.data)}</Text>
               </View>
-              <Text style={styles.workoutTitle}>{item.workoutTitle}</Text>
+              <Text style={styles.postSubtitle}>{item.titulo}</Text>
+              <Text style={styles.workoutTitle}>{item.descricao}</Text>
             </View>
           )}
           contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
         />
       </View>
 
@@ -156,8 +192,9 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 50 },
   emptyText: { color: colors.gray, textAlign: 'center' },
   postCard: { backgroundColor: '#1A1A1A', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#222' },
-  postHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  postHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   postAuthor: { color: colors.white, fontWeight: 'bold', fontSize: 15 },
   postTime: { color: colors.gray, fontSize: 11 },
-  workoutTitle: { color: colors.red, fontWeight: 'bold', fontSize: 17 },
+  postSubtitle: { color: colors.white, fontSize: 12, marginBottom: 4, opacity: 0.7 },
+  workoutTitle: { color: colors.red, fontWeight: 'bold', fontSize: 16 },
 });

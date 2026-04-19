@@ -42,11 +42,15 @@ class EvolucaoCreate(BaseModel):
 
 class EvolucaoResponse(BaseModel):
     id: int
-    data_registro: date
+    aluno_id: int
+    # MUDANÇA AQUI: de 'date' para 'datetime'
+    data_registro: datetime 
     peso: float
-    porcentagem_gordura: Optional[float]
-    massa_muscular: Optional[float]
-    class Config: from_attributes = True
+    porcentagem_gordura: float
+    massa_muscular: float
+
+    class Config:
+        from_attributes = True
 
 # --- ALUNO COMPLETO ---
 class AlunoResponse(BaseModel):
@@ -114,3 +118,14 @@ class NotificacaoResponse(BaseModel):
 
 class RespostaNotificacao(BaseModel):
     acao: str # 'ACEITAR' ou 'RECUSAR'
+
+class FeedItem(BaseModel):
+    id: int
+    tipo: str # 'TREINO', 'EVOLUCAO', 'SOCIAL'
+    usuario_nome: str
+    titulo: str
+    descricao: str
+    data: datetime
+    
+    class Config:
+        from_attributes = True

@@ -48,7 +48,7 @@ class Evolucao(Base):
     __tablename__ = "evolucoes"
     id = Column(Integer, primary_key=True, index=True)
     aluno_id = Column(Integer, ForeignKey("alunos.id"))
-    data_registro = Column(Date, default=date.today)
+    data_registro = Column(DateTime, default=datetime.utcnow)
     peso = Column(Float, nullable=False)
     porcentagem_gordura = Column(Float, nullable=True)
     massa_muscular = Column(Float, nullable=True)
