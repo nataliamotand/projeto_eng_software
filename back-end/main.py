@@ -6,6 +6,8 @@ from typing import List, Optional
 from database import SessionLocal, engine
 from datetime import date
 import models, schemas, auth
+from datetime import datetime
+from sqlalchemy import func
 
 # Garante a criação de todas as tabelas (incluindo as novas da Natália e sua Rotina)
 models.Base.metadata.create_all(bind=engine)
@@ -146,21 +148,25 @@ def solicitar_seguir(destino_id: int, email: str = Depends(auth.obter_usuario_at
 def registrar_evolucao(dados: schemas.EvolucaoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     aluno = u.perfil_aluno
-    if not aluno:
-        raise HTTPException(status_code=400, detail="Perfil de aluno não encontrado.")
     
-    hoje = date.today()
+    agora = datetime.now()
+    hoje = date.today() # Apenas para a busca
+
+    # Buscamos se existe registro NO DIA (truncando o timestamp para date)
     registro_hoje = db.query(models.Evolucao).filter(
         models.Evolucao.aluno_id == aluno.id,
-        models.Evolucao.data_registro == hoje
+        func.date(models.Evolucao.data_registro) == hoje
     ).first()
 
     if registro_hoje:
+        # Se já postou, atualiza o peso e o horário para o mais recente
         registro_hoje.peso = dados.peso
         registro_hoje.porcentagem_gordura = dados.porcentagem_gordura
         registro_hoje.massa_muscular = dados.massa_muscular
+        registro_hoje.data_registro = agora 
     else:
-        registro_hoje = models.Evolucao(aluno_id=aluno.id, data_registro=hoje, **dados.model_dump())
+        # Se é o primeiro do dia, cria novo
+        registro_hoje = models.Evolucao(aluno_id=aluno.id, data_registro=agora, **dados.model_dump())
         db.add(registro_hoje)
     
     db.commit()
@@ -244,3 +250,50 @@ def listar_usuarios_para_seguir(email: str = Depends(auth.obter_usuario_atual), 
     ).all()
     
     return usuarios
+
+@app.get("/aluno/feed-amigos", response_model=List[schemas.FeedItem])
+def obter_feed_amigos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    # 1. Descobrir quem é o usuário logado
+    meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+
+    # 2. Buscar os IDs de quem eu sigo (apenas conexões ACEITAS)
+    seguidos_ids = db.query(models.Seguidor.seguido_id).filter(
+        models.Seguidor.seguidor_id == meu_u.id,
+        models.Seguidor.status == "ACEITO"
+    ).all()
+    
+    ids_lista = [s[0] for s in seguidos_ids]
+
+    # Se não segue ninguém, retorna lista vazia imediatamente
+    if not ids_lista:
+        return []
+
+    # 3. O "Coração do Feed": Buscar atividades recentes dos seguidos
+    # Por enquanto, vamos buscar as Evoluções (medidas) que os amigos postaram
+    atividades = db.query(models.Evolucao).join(models.Aluno).filter(
+        models.Aluno.usuario_id.in_(ids_lista)
+    ).order_by(models.Evolucao.data_registro.desc()).limit(20).all()
+
+    # 4. Formatar os dados para o padrão que o Front-end da Gabi espera
+    feed_final = []
+    for ativ in atividades:
+        feed_final.append({
+            "id": ativ.id,
+            "tipo": "EVOLUCAO",
+            "usuario_nome": ativ.aluno.usuario.nome,
+            "titulo": "Nova conquista de medidas!",
+            "descricao": f"O atleta {ativ.aluno.usuario.nome} atualizou seu peso para {ativ.peso}kg. 💪",
+            "data": ativ.data_registro
+        })
+
+    return feed_final
+
+@app.get("/notificacoes/contagem")
+def contar_notificacoes_pendentes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    # Contamos apenas o que está PENDENTE para o usuário logado
+    total = db.query(models.Notificacao).filter(
+        models.Notificacao.destinatario_id == u.id,
+        models.Notificacao.status == "PENDENTE"
+    ).count()
+    return {"contagem": total}
