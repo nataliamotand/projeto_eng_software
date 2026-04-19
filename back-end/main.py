@@ -41,13 +41,6 @@ def disparar_notificacao(db: Session, dest_id: int, rem_id: Optional[int], titul
     )
     db.add(nova)
 
-# --- USUÁRIOS E AUTH (Sua base com GET /me) ---
-
-# Função utilitária para disparar notificações silenciosamente
-def disparar_notificacao(db: Session, dest_id: int, rem_id: Optional[int], titulo: str, msg: str, tipo: str, ref_id: Optional[int] = None):
-    nova = models.Notificacao(destinatario_id=dest_id, remetente_id=rem_id, titulo=titulo, mensagem=msg, tipo=tipo, referencia_id=ref_id)
-    db.add(nova)
-
 # --- USUÁRIOS E LOGIN ---
 @app.post("/usuarios", response_model=schemas.UsuarioResponse)
 def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
@@ -75,21 +68,26 @@ def ler_usuario_atual(email: str = Depends(auth.obter_usuario_atual), db: Sessio
     return usuario
 
 @app.put("/usuarios/me", response_model=schemas.UsuarioResponse)
-def atualizar_nome_usuario_atual(
-    dados: schemas.UsuarioPerfilUpdate,
+def atualizar_usuario_atual(
+    dados: schemas.UsuarioPerfilUpdate, # <--- O schema que acabamos de fixar
     email: str = Depends(auth.obter_usuario_atual),
     db: Session = Depends(get_db),
 ):
-    nome = (dados.nome or "").strip()
-    if len(nome) < 2:
-        raise HTTPException(status_code=400, detail="Nome deve ter pelo menos 2 caracteres.")
     usuario = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
     if not usuario:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    usuario.nome = nome
-    usuario.foto_perfil = dados.foto_perfil
-    db.commit()
-    db.refresh(usuario)
+
+    # Atualiza os campos apenas se eles forem enviados
+    if dados.nome:
+        usuario.nome = dados.nome
+    
+    # ESSA LINHA É A CHAVE:
+    if dados.foto_perfil is not None:
+        usuario.foto_perfil = dados.foto_perfil
+
+    db.commit() # Salva no arquivo .db
+    db.refresh(usuario) # Atualiza o objeto com os dados do banco
     return usuario
 
 @app.get("/alunos/me", response_model=schemas.AlunoObjetivoRead)

@@ -143,7 +143,12 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   avatar: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  avatarImage: { width: 30, height: 20, resizeMode: 'contain' },
+  avatarImage: { 
+    width: '100%', // Preenche todo o container
+    height: '100%', 
+    borderRadius: 22.5, // Mantém arredondado
+    resizeMode: 'cover' // Faz a foto preencher sem distorcer
+  },
   userInfo: { flexDirection: 'column' },
   userName: { color: colors.white, fontWeight: 'bold', fontSize: 16 },
   userHandle: { color: colors.white, opacity: 0.8, fontSize: 12 },

@@ -18,8 +18,8 @@ class UsuarioResponse(BaseModel):
     class Config: from_attributes = True
 
 class UsuarioPerfilUpdate(BaseModel):
-    nome: str
-    foto_perfil: Optional[str] = None
+    nome: Optional[str] = None
+    foto_perfil: Optional[str] = None  # <--- ESSA LINHA É OBRIGATÓRIA AQUI!
 
 class AlunoObjetivoRead(BaseModel):
     objetivo: Optional[str] = None
