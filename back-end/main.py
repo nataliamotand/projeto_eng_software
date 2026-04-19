@@ -6,6 +6,8 @@ from typing import List, Optional
 from database import SessionLocal, engine
 from datetime import date
 import models, schemas, auth
+from datetime import datetime
+from sqlalchemy import func
 
 # Garante a criação de todas as tabelas (incluindo as novas da Natália e sua Rotina)
 models.Base.metadata.create_all(bind=engine)
@@ -146,21 +148,25 @@ def solicitar_seguir(destino_id: int, email: str = Depends(auth.obter_usuario_at
 def registrar_evolucao(dados: schemas.EvolucaoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     aluno = u.perfil_aluno
-    if not aluno:
-        raise HTTPException(status_code=400, detail="Perfil de aluno não encontrado.")
     
-    hoje = date.today()
+    agora = datetime.now()
+    hoje = date.today() # Apenas para a busca
+
+    # Buscamos se existe registro NO DIA (truncando o timestamp para date)
     registro_hoje = db.query(models.Evolucao).filter(
         models.Evolucao.aluno_id == aluno.id,
-        models.Evolucao.data_registro == hoje
+        func.date(models.Evolucao.data_registro) == hoje
     ).first()
 
     if registro_hoje:
+        # Se já postou, atualiza o peso e o horário para o mais recente
         registro_hoje.peso = dados.peso
         registro_hoje.porcentagem_gordura = dados.porcentagem_gordura
         registro_hoje.massa_muscular = dados.massa_muscular
+        registro_hoje.data_registro = agora 
     else:
-        registro_hoje = models.Evolucao(aluno_id=aluno.id, data_registro=hoje, **dados.model_dump())
+        # Se é o primeiro do dia, cria novo
+        registro_hoje = models.Evolucao(aluno_id=aluno.id, data_registro=agora, **dados.model_dump())
         db.add(registro_hoje)
     
     db.commit()
@@ -281,3 +287,13 @@ def obter_feed_amigos(email: str = Depends(auth.obter_usuario_atual), db: Sessio
         })
 
     return feed_final
+
+@app.get("/notificacoes/contagem")
+def contar_notificacoes_pendentes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    # Contamos apenas o que está PENDENTE para o usuário logado
+    total = db.query(models.Notificacao).filter(
+        models.Notificacao.destinatario_id == u.id,
+        models.Notificacao.status == "PENDENTE"
+    ).count()
+    return {"contagem": total}

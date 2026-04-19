@@ -19,6 +19,29 @@ import NotificationButton from '../src/components/ui/NotificationButton';
 
 const { width } = Dimensions.get('window');
 
+function formatarTempoRelativo(dataIso: string) {
+  if (!dataIso) return 'Agora';
+  
+  const agora = new Date();
+  const dataPost = new Date(dataIso);
+
+  // Calcula a diferença em milissegundos
+  const diffInMs = agora.getTime() - dataPost.getTime();
+  const diffEmSegundos = Math.floor(diffInMs / 1000);
+
+  // Se a diferença for negativa (por causa de fuso horário), assume que foi agora
+  if (diffEmSegundos < 60) return 'Agora mesmo';
+  
+  const diffEmMinutos = Math.floor(diffEmSegundos / 60);
+  if (diffEmMinutos < 60) return `há ${diffEmMinutos} min`;
+  
+  const diffEmHoras = Math.floor(diffEmMinutos / 60);
+  if (diffEmHoras < 24) return `há ${diffEmHoras} h`;
+  
+  const diffEmDias = Math.floor(diffEmHoras / 24);
+  return `há ${diffEmDias} dias`;
+}
+
 export default function Home() {
   const router = useRouter();
   
@@ -26,6 +49,9 @@ export default function Home() {
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [userData, setUserData] = useState({ nome: '', handle: '' });
   const [feedPosts, setFeedPosts] = useState<any[]>([]);
+  
+  // NOVO ESTADO: Para a bolinha de notificações
+  const [notificacoesAtivas, setNotificacoesAtivas] = useState(0);
   
   useEffect(() => {
     async function syncHome() {
@@ -42,7 +68,15 @@ export default function Home() {
         });
         setUserProfile(tipo_perfil);
 
-        // 2. Busca o Feed (Garante que a rota /aluno/feed-amigos existe no Python)
+        // 2. BUSCA CONTAGEM DE NOTIFICAÇÕES (Nova Funcionalidade)
+        try {
+            const countRes = await api.get('/notificacoes/contagem');
+            setNotificacoesAtivas(countRes.data.contagem);
+        } catch (e) {
+            console.log("Erro ao buscar contagem de notificações");
+        }
+
+        // 3. Busca o Feed
         const endpoint = tipo_perfil === 'TEACHER' ? '/professor/feed-alunos' : '/aluno/feed-amigos';
         const feedRes = await api.get(endpoint);
         setFeedPosts(feedRes.data);
@@ -88,7 +122,8 @@ export default function Home() {
               <FontAwesome name="user-plus" size={20} color={colors.white} />
             </TouchableOpacity>
           )}
-          <NotificationButton />
+          {/* PASSO 4: Passando a quantidade para o botão disparar a bolinha vermelha */}
+          <NotificationButton quantidade={notificacoesAtivas} />
         </View>
       </View>
 
@@ -109,16 +144,16 @@ export default function Home() {
           renderItem={({ item }) => (
             <View style={styles.postCard}>
               <View style={styles.postHeader}>
-                {/* SINCRONIZADO: usuario_nome vem do seu FeedItem no Python */}
                 <Text style={styles.postAuthor}>{item.usuario_nome}</Text>
-                <Text style={styles.postTime}>Agora</Text>
+                {/* PASSO 5: Substituído "Agora" pela função de tempo real */}
+                <Text style={styles.postTime}>{formatarTempoRelativo(item.data)}</Text>
               </View>
-              {/* SINCRONIZADO: titulo e descricao do seu backend */}
               <Text style={styles.postSubtitle}>{item.titulo}</Text>
               <Text style={styles.workoutTitle}>{item.descricao}</Text>
             </View>
           )}
           contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
         />
       </View>
 

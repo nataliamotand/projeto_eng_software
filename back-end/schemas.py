@@ -31,11 +31,15 @@ class EvolucaoCreate(BaseModel):
 
 class EvolucaoResponse(BaseModel):
     id: int
-    data_registro: date
+    aluno_id: int
+    # MUDANÇA AQUI: de 'date' para 'datetime'
+    data_registro: datetime 
     peso: float
-    porcentagem_gordura: Optional[float]
-    massa_muscular: Optional[float]
-    class Config: from_attributes = True
+    porcentagem_gordura: float
+    massa_muscular: float
+
+    class Config:
+        from_attributes = True
 
 # --- ALUNO COMPLETO ---
 class AlunoResponse(BaseModel):
