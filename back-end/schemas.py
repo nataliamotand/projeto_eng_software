@@ -103,3 +103,14 @@ class NotificacaoResponse(BaseModel):
 
 class RespostaNotificacao(BaseModel):
     acao: str # 'ACEITAR' ou 'RECUSAR'
+
+class FeedItem(BaseModel):
+    id: int
+    tipo: str # 'TREINO', 'EVOLUCAO', 'SOCIAL'
+    usuario_nome: str
+    titulo: str
+    descricao: str
+    data: datetime
+    
+    class Config:
+        from_attributes = True

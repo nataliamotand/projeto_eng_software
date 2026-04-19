@@ -15,9 +15,7 @@ import { useRouter } from 'expo-router';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api';
-
-// IMPORTAÇÕES NOVAS
-import NotificationButton from '../src/components/ui/NotificationButton'; // O componente que criamos
+import NotificationButton from '../src/components/ui/NotificationButton';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +31,8 @@ export default function Home() {
     async function syncHome() {
       try {
         setLoading(true);
+        
+        // 1. Busca dados do usuário logado
         const userRes = await api.get('/usuarios/me');
         const { nome, tipo_perfil } = userRes.data;
         
@@ -42,6 +42,7 @@ export default function Home() {
         });
         setUserProfile(tipo_perfil);
 
+        // 2. Busca o Feed (Garante que a rota /aluno/feed-amigos existe no Python)
         const endpoint = tipo_perfil === 'TEACHER' ? '/professor/feed-alunos' : '/aluno/feed-amigos';
         const feedRes = await api.get(endpoint);
         setFeedPosts(feedRes.data);
@@ -66,7 +67,7 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* HEADER DINÂMICO REVISADO */}
+      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
@@ -79,17 +80,14 @@ export default function Home() {
         </View>
 
         <View style={styles.headerRight}>
-          {/* REGRA: Só Aluno vê botão de adicionar amigo */}
           {userProfile === 'STUDENT' && (
             <TouchableOpacity 
               onPress={() => router.push('/add_friends')}
-              style={{ marginRight: 15 }} // Espaçamento entre os ícones
+              style={{ marginRight: 15 }}
             >
               <FontAwesome name="user-plus" size={20} color={colors.white} />
             </TouchableOpacity>
           )}
-
-          {/* O BOTÃO COM A BOLINHA ENTRA AQUI */}
           <NotificationButton />
         </View>
       </View>
@@ -111,10 +109,13 @@ export default function Home() {
           renderItem={({ item }) => (
             <View style={styles.postCard}>
               <View style={styles.postHeader}>
-                <Text style={styles.postAuthor}>{item.authorName}</Text>
-                <Text style={styles.postTime}>{item.timeAgo || 'Agora'}</Text>
+                {/* SINCRONIZADO: usuario_nome vem do seu FeedItem no Python */}
+                <Text style={styles.postAuthor}>{item.usuario_nome}</Text>
+                <Text style={styles.postTime}>Agora</Text>
               </View>
-              <Text style={styles.workoutTitle}>{item.workoutTitle}</Text>
+              {/* SINCRONIZADO: titulo e descricao do seu backend */}
+              <Text style={styles.postSubtitle}>{item.titulo}</Text>
+              <Text style={styles.workoutTitle}>{item.descricao}</Text>
             </View>
           )}
           contentContainerStyle={{ paddingBottom: 100 }}
@@ -149,8 +150,9 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 50 },
   emptyText: { color: colors.gray, textAlign: 'center' },
   postCard: { backgroundColor: '#1A1A1A', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#222' },
-  postHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  postHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
   postAuthor: { color: colors.white, fontWeight: 'bold', fontSize: 15 },
   postTime: { color: colors.gray, fontSize: 11 },
-  workoutTitle: { color: colors.red, fontWeight: 'bold', fontSize: 17 },
+  postSubtitle: { color: colors.white, fontSize: 12, marginBottom: 4, opacity: 0.7 },
+  workoutTitle: { color: colors.red, fontWeight: 'bold', fontSize: 16 },
 });

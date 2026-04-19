@@ -244,3 +244,40 @@ def listar_usuarios_para_seguir(email: str = Depends(auth.obter_usuario_atual), 
     ).all()
     
     return usuarios
+
+@app.get("/aluno/feed-amigos", response_model=List[schemas.FeedItem])
+def obter_feed_amigos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    # 1. Descobrir quem é o usuário logado
+    meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+
+    # 2. Buscar os IDs de quem eu sigo (apenas conexões ACEITAS)
+    seguidos_ids = db.query(models.Seguidor.seguido_id).filter(
+        models.Seguidor.seguidor_id == meu_u.id,
+        models.Seguidor.status == "ACEITO"
+    ).all()
+    
+    ids_lista = [s[0] for s in seguidos_ids]
+
+    # Se não segue ninguém, retorna lista vazia imediatamente
+    if not ids_lista:
+        return []
+
+    # 3. O "Coração do Feed": Buscar atividades recentes dos seguidos
+    # Por enquanto, vamos buscar as Evoluções (medidas) que os amigos postaram
+    atividades = db.query(models.Evolucao).join(models.Aluno).filter(
+        models.Aluno.usuario_id.in_(ids_lista)
+    ).order_by(models.Evolucao.data_registro.desc()).limit(20).all()
+
+    # 4. Formatar os dados para o padrão que o Front-end da Gabi espera
+    feed_final = []
+    for ativ in atividades:
+        feed_final.append({
+            "id": ativ.id,
+            "tipo": "EVOLUCAO",
+            "usuario_nome": ativ.aluno.usuario.nome,
+            "titulo": "Nova conquista de medidas!",
+            "descricao": f"O atleta {ativ.aluno.usuario.nome} atualizou seu peso para {ativ.peso}kg. 💪",
+            "data": ativ.data_registro
+        })
+
+    return feed_final
