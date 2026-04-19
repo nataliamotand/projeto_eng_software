@@ -15,6 +15,9 @@ import {
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../src/components/ui/theme';
+import api from '../src/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 const { height, width } = Dimensions.get('window');
 
@@ -40,6 +43,91 @@ export default function Register(): JSX.Element {
     const role = (params as any).role;
     if (role === 'TEACHER') setIsPro(true);
   }, [params]);
+
+  async function handleRegister() {
+    // 1. Início do teste
+    console.log("--- INICIANDO PROCESSO DE CADASTRO ---");
+    
+    const ok = validateAll();
+    if (!ok) {
+      console.log("Falha na validação dos campos locais.");
+      return;
+    }
+
+    try {
+      // 2. Formatação da Data (Ajuste para o Pydantic do Python)
+      const [day, month, year] = dob.split('/');
+      const dateFormatted = `${year}-${month}-${day}`;
+      console.log("Data formatada para o Backend:", dateFormatted);
+
+      // 3. PASSO A: Criar Usuário Base
+      console.log("Tentando POST /usuarios...");
+      const userPayload = {
+        nome: name,
+        email: email,
+        senha: password,
+        data_nascimento: dateFormatted,
+        tipo_perfil: isPro ? 'TEACHER' : 'STUDENT',
+      };
+      
+      await api.post('/usuarios', userPayload);
+      console.log("Passo A concluído: Usuário criado.");
+
+      // 4. PASSO B: Login Automático (Necessário para pegar o Token)
+      console.log("Tentando POST /login...");
+      const loginData = new FormData();
+      loginData.append('username', email);
+      loginData.append('password', password);
+
+      const loginRes = await api.post('/login', loginData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const { access_token } = loginRes.data;
+      await AsyncStorage.setItem('token', access_token);
+      console.log("Passo B concluído: Token armazenado.");
+
+      // 5. PASSO C: Criar Perfil Específico
+      console.log(isPro ? "Criando Perfil Professor..." : "Criando Perfil Aluno...");
+      if (isPro) {
+        await api.post('/professores', { cref: cref });
+      } else {
+        await api.post('/alunos', { objetivo: "Meu primeiro acesso via App" });
+      }
+      console.log("Passo C concluído: Perfil vinculado.");
+
+      // 6. Sucesso Final
+      Alert.alert("Sucesso!", "Conta e perfil criados com sucesso.");
+      router.replace('/home');
+
+    } catch (error: any) {
+      // --- BLOCO DE DIAGNÓSTICO DE ERROS ---
+      console.log("--- ERRO NO CADASTRO ---");
+      
+      if (!error.response) {
+        // Erro de Rede (O App não achou o servidor)
+        console.error("Erro de conexão (Network Error). Verifique o IP no api.ts");
+        Alert.alert(
+          "Erro de Conexão", 
+          "O App não conseguiu falar com o servidor. Verifique se o IP no api.ts é o IP atual da sua máquina (ipconfig)."
+        );
+      } else {
+        // Erro vindo do Backend (400, 422, 500)
+        const status = error.response.status;
+        const detail = error.response.data?.detail || "Erro desconhecido";
+        
+        console.error(`Backend retornou Erro ${status}:`, detail);
+        
+        if (status === 422) {
+          Alert.alert("Erro de Validação (422)", "O backend não aceitou os dados. Verifique se a data está no formato YYYY-MM-DD.");
+        } else if (status === 400) {
+          Alert.alert("Usuário já existe", "Este e-mail já está cadastrado no sistema.");
+        } else {
+          Alert.alert(`Erro ${status}`, detail);
+        }
+      }
+    }
+  }
 
   function validateDobFormat(dobStr: string) {
     if (!dobStr || dobStr.trim() === '') return 'Data de nascimento é obrigatória.';
@@ -272,19 +360,13 @@ export default function Register(): JSX.Element {
             </View>
 
             <TouchableOpacity
-              style={styles.button}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              onPress={() => {
-                // validate all fields before submitting
-                const ok = validateAll();
-                if (!ok) return;
-                // TODO: Integrar API de registro (envio de dados e role)
-                router.replace('/home');
-              }}
-            >
-              <Text style={styles.buttonText}>Entrar</Text>
-            </TouchableOpacity>
+  style={styles.button}
+  activeOpacity={0.85}
+  accessibilityRole="button"
+  onPress={handleRegister} // <--- Agora o botão chama a função correta que faz o POST
+>
+  <Text style={styles.buttonText}>Registrar</Text> 
+</TouchableOpacity>
             </View>
           </ScrollView>
 
