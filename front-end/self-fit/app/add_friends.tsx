@@ -25,6 +25,7 @@ interface Usuario {
   nome: string;
   email: string;
   tipo_perfil: string;
+  foto_perfil?: string | null;
 }
 
 export default function AddFriends(){
@@ -73,25 +74,20 @@ export default function AddFriends(){
   });
 
   function renderUser({ item }: { item: Usuario }) {
+    const avatarSource = item.foto_perfil
+      ? { uri: item.foto_perfil }
+      : require('../assets/images/logo.png');
+
     return (
       <View style={styles.userRow}>
         <View style={styles.userLeft}>
-          {/* Usando um placeholder caso não tenha imagem no banco ainda */}
           <Image 
-            source={require('../assets/images/logo.png')} 
+            source={avatarSource} 
             style={styles.avatar} 
           />
           <View style={styles.userTexts}>
             <Text style={styles.userName}>{item.nome}</Text>
             <Text style={styles.userLogin}>{item.email}</Text>
-            
-            <View style={styles.subtitleRow}>
-              <Text style={styles.userSubtitle}>Sugestão para você</Text>
-              <View style={styles.miniAvatars}>
-                <Image source={require('../assets/images/react-logo.png')} style={[styles.miniAvatar, { left: 0 }]} />
-                <Image source={require('../assets/images/icon.png')} style={[styles.miniAvatar, { left: 10 }]} />
-              </View>
-            </View>
           </View>
         </View>
 
@@ -189,10 +185,6 @@ const styles = StyleSheet.create({
   userTexts: { marginLeft: 12 },
   userName: { color: colors.white, fontWeight: '700', fontSize: 15 },
   userLogin: { color: colors.grayText, fontSize: 13, marginTop: 4 },
-  subtitleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  userSubtitle: { color: colors.grayText, fontSize: 12 },
-  miniAvatars: { width: 40, height: 20, marginLeft: 8, position: 'relative' },
-  miniAvatar: { width: 24, height: 24, borderRadius: 12, position: 'absolute', borderWidth: 2, borderColor: colors.background },
 
   userRight: { flexDirection: 'row', alignItems: 'center' },
   followButton: { backgroundColor: colors.red, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
