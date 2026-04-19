@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import text, func
 from typing import List, Optional
 from database import SessionLocal, engine
@@ -110,7 +110,27 @@ def feed(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(g
 @app.get("/notificacoes", response_model=List[schemas.NotificacaoResponse])
 def listar_notif(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    return db.query(models.Notificacao).filter(models.Notificacao.destinatario_id == u.id, models.Notificacao.status == "PENDENTE").all()
+    rows = (
+        db.query(models.Notificacao)
+        .options(joinedload(models.Notificacao.remetente))
+        .filter(models.Notificacao.destinatario_id == u.id, models.Notificacao.status == "PENDENTE")
+        .order_by(models.Notificacao.data_criacao.desc())
+        .all()
+    )
+    return [
+        schemas.NotificacaoResponse(
+            id=n.id,
+            titulo=n.titulo,
+            mensagem=n.mensagem,
+            tipo=n.tipo,
+            status=n.status,
+            data_criacao=n.data_criacao,
+            remetente_id=n.remetente_id,
+            referencia_id=n.referencia_id,
+            remetente_foto=n.remetente.foto_perfil if n.remetente else None,
+        )
+        for n in rows
+    ]
 
 @app.get("/notificacoes/contagem")
 def contar_notif(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):

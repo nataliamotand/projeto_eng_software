@@ -114,6 +114,7 @@ class NotificacaoResponse(BaseModel):
     data_criacao: datetime
     remetente_id: Optional[int]
     referencia_id: Optional[int]
+    remetente_foto: Optional[str] = None
     class Config: from_attributes = True
 
 class RespostaNotificacao(BaseModel):
@@ -123,6 +124,7 @@ class FeedItem(BaseModel):
     id: int
     tipo: str # 'TREINO', 'EVOLUCAO', 'SOCIAL'
     usuario_nome: str
+    usuario_foto: Optional[str] = None
     titulo: str
     descricao: str
     data: datetime

@@ -23,7 +23,7 @@ import { colors } from '../src/components/ui/theme';
 
 const { height, width } = Dimensions.get('window');
 
-export default function Register(): JSX.Element {
+export default function Register(){
   const router = useRouter();
   const params = useLocalSearchParams ? useLocalSearchParams() : {};
 
