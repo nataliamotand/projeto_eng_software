@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import text, func
+from sqlalchemy import text, cast, Date
 from typing import List, Optional
 from database import SessionLocal, engine
 from datetime import date, datetime
@@ -83,15 +83,93 @@ def listar_rotinas(email: str = Depends(auth.obter_usuario_atual), db: Session =
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     return u.perfil_aluno.rotinas if u.perfil_aluno else []
 
+@app.get("/alunos/meu-historico", response_model=List[schemas.EvolucaoResponse])
+def meu_historico_evolucao(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if u.tipo_perfil != "STUDENT" or not u.perfil_aluno:
+        return []
+    return (
+        db.query(models.Evolucao)
+        .filter(models.Evolucao.aluno_id == u.perfil_aluno.id)
+        .order_by(models.Evolucao.data_registro.asc())
+        .all()
+    )
+
+@app.post("/alunos/evolucao", response_model=schemas.EvolucaoResponse)
+def registrar_evolucao(
+    dados: schemas.EvolucaoCreate,
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db),
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if u.tipo_perfil != "STUDENT":
+        raise HTTPException(status_code=403, detail="Apenas alunos podem registrar medidas.")
+    if not u.perfil_aluno:
+        raise HTTPException(status_code=400, detail="Crie seu perfil de aluno antes de registrar medidas.")
+    aluno = u.perfil_aluno
+    hoje = datetime.utcnow().date()
+    existente_hoje = (
+        db.query(models.Evolucao)
+        .filter(
+            models.Evolucao.aluno_id == aluno.id,
+            cast(models.Evolucao.data_registro, Date) == hoje,
+        )
+        .first()
+    )
+    if existente_hoje:
+        existente_hoje.peso = dados.peso
+        existente_hoje.porcentagem_gordura = dados.porcentagem_gordura
+        existente_hoje.massa_muscular = dados.massa_muscular
+        db.commit()
+        db.refresh(existente_hoje)
+        return existente_hoje
+    nova = models.Evolucao(
+        aluno_id=aluno.id,
+        peso=dados.peso,
+        porcentagem_gordura=dados.porcentagem_gordura,
+        massa_muscular=dados.massa_muscular,
+    )
+    db.add(nova)
+    db.commit()
+    db.refresh(nova)
+    return nova
+
 # --- 3. SOCIAL E FEED ---
 @app.get("/usuarios/descobrir", response_model=List[schemas.UsuarioResponse])
 def descobrir(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    return db.query(models.Usuario).filter(models.Usuario.id != meu_u.id, models.Usuario.tipo_perfil == "STUDENT").all()
+    status_ativos = ("PENDENTE", "ACEITO")
+    ids_ja_ligados = {row[0] for row in db.query(models.Seguidor.seguido_id).filter(
+        models.Seguidor.seguidor_id == meu_u.id,
+        models.Seguidor.status.in_(status_ativos),
+    ).all()}
+    ids_ja_ligados.update(
+        row[0]
+        for row in db.query(models.Seguidor.seguidor_id).filter(
+            models.Seguidor.seguido_id == meu_u.id,
+            models.Seguidor.status.in_(status_ativos),
+        ).all()
+    )
+    q = db.query(models.Usuario).filter(
+        models.Usuario.id != meu_u.id,
+        models.Usuario.tipo_perfil == "STUDENT",
+    )
+    if ids_ja_ligados:
+        q = q.filter(~models.Usuario.id.in_(ids_ja_ligados))
+    return q.all()
 
 @app.post("/usuarios/seguir/{destino_id}")
 def seguir(destino_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if destino_id == meu_u.id:
+        raise HTTPException(status_code=400, detail="Não é possível seguir a si mesmo.")
+    ja_existe = db.query(models.Seguidor).filter(
+        models.Seguidor.seguidor_id == meu_u.id,
+        models.Seguidor.seguido_id == destino_id,
+        models.Seguidor.status.in_(("PENDENTE", "ACEITO")),
+    ).first()
+    if ja_existe:
+        raise HTTPException(status_code=400, detail="Solicitação ou vínculo já existente com este usuário.")
     novo = models.Seguidor(seguidor_id=meu_u.id, seguido_id=destino_id)
     db.add(novo); db.flush()
     disparar_notificacao(db, destino_id, meu_u.id, "Novo Seguidor", f"{meu_u.nome} começou a seguir você.", "SOLICITACAO_SEGUIR", novo.id)

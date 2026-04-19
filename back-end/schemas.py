@@ -43,11 +43,10 @@ class EvolucaoCreate(BaseModel):
 class EvolucaoResponse(BaseModel):
     id: int
     aluno_id: int
-    # MUDANÇA AQUI: de 'date' para 'datetime'
-    data_registro: datetime 
+    data_registro: datetime
     peso: float
-    porcentagem_gordura: float
-    massa_muscular: float
+    porcentagem_gordura: Optional[float] = None
+    massa_muscular: Optional[float] = None
 
     class Config:
         from_attributes = True
