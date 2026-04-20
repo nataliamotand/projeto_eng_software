@@ -127,3 +127,74 @@ def responder_notif(notificacao_id: int, dados: schemas.RespostaNotificacao, ema
         if dados.acao == "ACEITAR": reg.status = "ACEITO"; notif.status = "ACEITO"
         else: db.delete(reg); notif.status = "REJEITADO"
     db.commit(); return {"status": "ok"}
+
+# --- 5.1 PROFESSOR - ALUNOS VINCULADOS ---
+@app.get("/professor/alunos")
+def listar_meus_alunos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    # Pega usuário logado
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+
+    # Valida perfil de professor
+    if not u.perfil_professor:
+        raise HTTPException(status_code=400, detail="Usuário não é professor")
+
+    prof = u.perfil_professor
+
+    # Busca alunos vinculados ao professor
+    alunos = db.query(models.Aluno).filter(models.Aluno.professor_id == prof.id).all()
+
+    # Formata resposta para o front
+    return [
+        {
+            "id": a.id,
+            "nome": a.usuario.nome,
+            "email": a.usuario.email,
+            "username": a.usuario.email.split("@")[0] if a.usuario.email else "user",
+            "foto_perfil": a.usuario.foto_perfil,
+            "objetivo": a.objetivo
+        }
+        for a in alunos
+    ]
+
+# --- 5.2 PROFESSOR - DESCOBRIR ALUNOS ---
+@app.get("/professor/descobrir-alunos")
+def descobrir_alunos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    # Usuário logado
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+
+    # Valida professor
+    if not u.perfil_professor:
+        raise HTTPException(status_code=400, detail="Usuário não é professor")
+
+    prof = u.perfil_professor
+
+    # Busca alunos que NÃO estão vinculados a esse professor
+    alunos = db.query(models.Aluno).filter(
+        (models.Aluno.professor_id == None) | (models.Aluno.professor_id != prof.id)
+    ).all()
+
+    return [
+        {
+            "id": a.id,
+            "nome": a.usuario.nome,
+            "username": a.usuario.email.split("@")[0] if a.usuario.email else "user",
+            "foto_perfil": a.usuario.foto_perfil,
+            "objetivo": a.objetivo
+        }
+        for a in alunos
+    ]
+
+# --- 5.3 PROFESSOR - VINCULAR ALUNO ---
+@app.put("/professor/vincular-aluno/{aluno_id}")
+def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    prof = u.perfil_professor
+
+    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+
+    aluno.professor_id = prof.id
+    db.commit()
+
+    return {"status": "ok"}

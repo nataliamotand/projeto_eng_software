@@ -20,29 +20,52 @@ import api from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
-const mockedClients = [
-  {
-    id: 'c1',
-    name: 'João Silva',
-    username: 'joaosilva',
-    objective: 'Hipertrofia',
-    avatar: 'https://picsum.photos/seed/joao/200/200',
-  },
-  {
-    id: 'c2',
-    name: 'Mariana Costa',
-    username: 'marianac',
-    objective: 'Perda de peso',
-    avatar: 'https://picsum.photos/seed/mariana/200/200',
-  },
-  {
-    id: 'c3',
-    name: 'Lucas Pereira',
-    username: 'lucasp',
-    objective: 'Condicionamento/Cardio',
-    avatar: 'https://picsum.photos/seed/lucas/200/200',
-  },
-];
+// --- BUSCAR ALUNOS DISPONÍVEIS ---
+const fetchSuggestions = async () => {
+  try {
+    const res = await api.get('/professor/descobrir-alunos');
+
+    const formatted = res.data.map((aluno: any) => ({
+      id: String(aluno.id),
+      name: aluno.nome,
+      username: aluno.username,
+      subtitle: aluno.objetivo || 'Disponível',
+      avatar: aluno.foto_perfil
+        ? { uri: aluno.foto_perfil }
+        : require('../assets/images/logo.png'),
+    }));
+
+    setSuggestions(formatted);
+
+  } catch (error) {
+    console.error('Erro ao buscar sugestões:', error);
+  }
+};
+
+// --- CARREGAR ALUNOS AO INICIAR ---
+useEffect(() => {
+  fetchClients();
+}, []);
+
+// --- BUSCAR ALUNOS DO PROFESSOR ---
+const fetchClients = async () => {
+  try {
+    const res = await api.get('/professor/alunos');
+
+    const formatted = res.data.map((aluno: any) => ({
+      id: String(aluno.id),
+      name: aluno.nome,
+      username: aluno.username,
+      objective: aluno.objetivo || 'Geral',
+      avatar: aluno.foto_perfil || 'https://picsum.photos/200',
+    }));
+
+    setClients(formatted);
+
+  } catch (error) {
+    console.error('Erro ao buscar alunos:', error);
+  }
+};
 
 function Header({ user }: { user: any }) {
   const router = useRouter();
@@ -129,19 +152,14 @@ function BottomNav() {
 
 export default function Clients() {
   const [query, setQuery] = useState('');
-  const [clients, setClients] = useState(mockedClients);
+  const [clients, setClients] = useState<any[]>([]);
   const [user, setUser] = useState<any>(null);
   const [openOptionsClientId, setOpenOptionsClientId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [newUsername, setNewUsername] = useState('');
   const [newObjective, setNewObjective] = useState('');
-  const [suggestions, setSuggestions] = useState([
-    { id: 's1', name: 'Mariana Silva', username: 'maris', subtitle: '3 em comum', avatar: require('../assets/images/logo.png') },
-    { id: 's2', name: 'Carlos Pereira', username: 'carlosp', subtitle: 'Sugestões para você', avatar: require('../assets/images/react-logo.png') },
-    { id: 's3', name: 'Ana Souza', username: 'anas', subtitle: '2 em comum', avatar: require('../assets/images/logo_google.png') },
-    { id: 's4', name: 'Pedro Gomes', username: 'pedrog', subtitle: '1 em comum', avatar: require('../assets/images/icon.png') },
-  ] as Array<any>);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   const data = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return clients;
