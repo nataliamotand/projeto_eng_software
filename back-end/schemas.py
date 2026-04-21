@@ -136,3 +136,26 @@ class FeedItem(BaseModel):
     descricao: str
     data: datetime
     class Config: from_attributes = True
+
+class ExercicioRealizadoBase(BaseModel):
+    nome: str
+    series: int
+    repeticoes: str
+    carga: str
+
+class TreinoFinalizadoCreate(BaseModel):
+    titulo: str
+    duracao_minutos: int
+    volume_total: float
+    exercicios: List[ExercicioRealizadoBase] # A lista de exercícios feitos
+
+class TreinoFinalizadoResponse(BaseModel):
+    id: int
+    titulo: str
+    data_fim: datetime
+    duracao_minutos: int
+    volume_total: float
+    exercicios: List[ExercicioRealizadoBase] = []
+
+    class Config:
+        from_attributes = True

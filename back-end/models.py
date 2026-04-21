@@ -43,6 +43,7 @@ class Aluno(Base):
     rotinas = relationship("Rotina", back_populates="aluno")
     historico_evolucao = relationship("Evolucao", back_populates="aluno", cascade="all, delete-orphan")
     fichas = relationship("FichaTreino", back_populates="aluno")
+    historico_treinos = relationship("TreinoRealizado", back_populates="aluno")
 
 class Evolucao(Base):
     __tablename__ = "evolucoes"
@@ -114,3 +115,31 @@ class Notificacao(Base):
     
     destinatario = relationship("Usuario", foreign_keys=[destinatario_id], back_populates="notificacoes_recebidas")
     remetente = relationship("Usuario", foreign_keys=[remetente_id])
+
+class TreinoRealizado(Base):
+    __tablename__ = "treinos_realizados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    aluno_id = Column(Integer, ForeignKey("alunos.id"))
+    titulo = Column(String)
+    data_fim = Column(DateTime, default=datetime.utcnow)
+    duracao_minutos = Column(Integer)
+    volume_total = Column(Float, default=0)
+
+    # Relacionamentos
+    aluno = relationship("Aluno", back_populates="historico_treinos")
+    # Link com os exercícios específicos deste treino
+    exercicios = relationship("ExercicioRealizado", back_populates="treino", cascade="all, delete-orphan")
+
+class ExercicioRealizado(Base):
+    __tablename__ = "exercicios_realizados"
+
+    id = Column(Integer, primary_key=True, index=True)
+    treino_id = Column(Integer, ForeignKey("treinos_realizados.id"))
+    nome = Column(String) # Ex: "3_4_Sit-Up"
+    series = Column(Integer)
+    repeticoes = Column(String)
+    carga = Column(String)
+
+    # Relacionamento reverso
+    treino = relationship("TreinoRealizado", back_populates="exercicios")

@@ -12,6 +12,8 @@ import {
   Modal,
   Pressable,
   Alert,
+  Platform,
+  ActivityIndicator
 } from 'react-native';
 import ImageRotator from '../src/components/ui/image-rotator';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
@@ -67,6 +69,7 @@ export default function CreateRoutine() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuTargetId, setMenuTargetId] = useState<string | number | null>(null);
   const [publishMenuVisible, setPublishMenuVisible] = useState(false);
+  const [loading, setLoading] = useState(false); // Adicionei o estado de loading caso não tivesse
 
   // 1. Hidratação inicial
   useEffect(() => {
@@ -109,14 +112,14 @@ export default function CreateRoutine() {
     }, [])
   );
 
-  // --- LÓGICA DE SALVAMENTO NO BACK-END ---
+  // --- LÓGICA DE SALVAMENTO NO BACK-END (ATUALIZADA) ---
   async function handleProceedAlone() {
     try {
-      // No create_routine.tsx, dentro de handleProceedAlone
+      setLoading(true);
       const payload = {
         titulo: routineTitle,
         exercicios: selectedExercises.map(ex => ({
-          exercicio_referencia_id: String(ex.id), // Envia "3_4_Sit-Up" completo!
+          exercicio_referencia_id: String(ex.id), 
           series: ex.sets.length,
           repeticoes: String(ex.sets[0]?.reps || "0"),
           carga: String(ex.sets[0]?.weight || "0"),
@@ -124,7 +127,7 @@ export default function CreateRoutine() {
         }))
       };
 
-      console.log("🚀 PAYLOAD QUE VAI PARA O BACK-END:", JSON.stringify(payload, null, 2));
+      console.log("🚀 Enviando rotina:", payload.titulo);
 
       await api.post('/fichas', payload);
       
@@ -132,12 +135,28 @@ export default function CreateRoutine() {
       (globalThis as any).__CURRENT_ROUTINE_EXERCISES = [];
       setPublishMenuVisible(false);
       
+      // Feedback e Navegação
       Alert.alert("Sucesso", "Treino salvo no seu perfil!", [
-        { text: "OK", onPress: () => router.push('/routines_and_workouts') }
+        { 
+          text: "OK", 
+          onPress: () => {
+            // replace remove a tela de 'criar' do histórico, 
+            // evitando que o usuário volte para o formulário ao usar o botão 'voltar' do Android
+            router.replace('/routines_and_workouts'); 
+          } 
+        }
       ]);
+
+      // Fallback para Web (onde o Alert.alert às vezes não bloqueia o código)
+      if (Platform.OS === 'web') {
+        router.replace('/routines_and_workouts');
+      }
+
     } catch (error: any) {
       console.error("Erro ao salvar:", error.response?.data || error.message);
       Alert.alert("Erro", "Não foi possível salvar a rotina no servidor.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -171,9 +190,9 @@ export default function CreateRoutine() {
         <TouchableOpacity 
           style={[styles.updateButton, (!routineTitle || selectedExercises.length === 0) && { opacity: 0.45 }]} 
           onPress={() => setPublishMenuVisible(true)}
-          disabled={!routineTitle || selectedExercises.length === 0}
+          disabled={!routineTitle || selectedExercises.length === 0 || loading}
         >
-          <Text style={styles.updateText}>Criar</Text>
+          {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.updateText}>Criar</Text>}
         </TouchableOpacity>
       </View>
 
