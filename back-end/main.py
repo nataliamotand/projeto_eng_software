@@ -270,3 +270,44 @@ def finalizar_treino(
 
     db.commit()
     return {"status": "sucesso", "id": novo_treino.id}
+
+@app.put("/fichas/{ficha_id}", response_model=schemas.FichaTreinoResponse)
+def atualizar_ficha(
+    ficha_id: int, 
+    ficha_dados: schemas.FichaTreinoCreate, 
+    db: Session = Depends(get_db), 
+    email: str = Depends(auth.obter_usuario_atual)
+):
+    # 1. Verifica se o usuário/aluno existe
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # 2. Busca a ficha garantindo que ela pertence ao aluno (Segurança!)
+    db_ficha = db.query(models.FichaTreino).filter(
+        models.FichaTreino.id == ficha_id, 
+        models.FichaTreino.aluno_id == u.perfil_aluno.id
+    ).first()
+
+    if not db_ficha:
+        raise HTTPException(status_code=404, detail="Rotina não encontrada.")
+
+    # 3. Atualiza o título
+    db_ficha.titulo = ficha_dados.titulo
+
+    # 4. Remove os exercícios antigos para reinserir os novos editados
+    db.query(models.ItemExercicio).filter(models.ItemExercicio.ficha_id == ficha_id).delete()
+
+    # 5. Adiciona os novos itens
+    for ex in ficha_dados.exercicios:
+        item = models.ItemExercicio(
+            ficha_id=ficha_id,
+            exercicio_referencia_id=ex.exercicio_referencia_id,
+            series=ex.series,
+            repeticoes=ex.repeticoes,
+            carga=ex.carga,
+            observacao=ex.observacao
+        )
+        db.add(item)
+
+    db.commit()
+    db.refresh(db_ficha)
+    return db_ficha

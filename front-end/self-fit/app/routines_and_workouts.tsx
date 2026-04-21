@@ -234,8 +234,17 @@ export default function RoutinesAndWorkouts() {
               <View style={styles.modalContentCentered}>
                 <Text style={styles.modalAlertText}>Opções da Rotina</Text>
                 
-                <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleEdit(openMenuId!)}>
-                  <Text style={styles.modalOptionText}>Editar rotina</Text>
+                <TouchableOpacity 
+                  style={styles.modalOptionButton} 
+                  onPress={() => {
+                  setOpenMenuId(null);
+                  router.push({
+                  pathname: '/edit_routine',
+                  params: { id: openMenuId } // Passa o ID da rotina para a tela de edição
+                });
+              }}
+>
+                <Text style={styles.modalOptionText}>Editar rotina</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity 
