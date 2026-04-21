@@ -162,3 +162,30 @@ def listar_notif(email: str = Depends(auth.obter_usuario_atual), db: Session = D
         models.Notificacao.destinatario_id == u.id, 
         models.Notificacao.status == "PENDENTE"
     ).order_by(models.Notificacao.data_criacao.desc()).all()
+
+# --- 5. ROTA DE EXCLUSÃO (CORRIGIDA) ---
+
+@app.delete("/fichas/{ficha_id}", status_code=204)
+def deletar_ficha(
+    ficha_id: int, 
+    db: Session = Depends(get_db), 
+    email: str = Depends(auth.obter_usuario_atual) # Usando o mesmo padrão das outras rotas
+):
+    # 1. Busca o usuário para saber o ID do aluno
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_aluno:
+        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
+
+    # 2. Busca a ficha garantindo que ela pertence ao aluno logado (Segurança!)
+    ficha = db.query(models.FichaTreino).filter(
+        models.FichaTreino.id == ficha_id, 
+        models.FichaTreino.aluno_id == u.perfil_aluno.id
+    ).first()
+
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Rotina não encontrada ou acesso negado.")
+
+    # 3. Deleta do banco
+    db.delete(ficha)
+    db.commit()
+    return None

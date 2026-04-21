@@ -11,7 +11,8 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
@@ -23,7 +24,7 @@ import { TextInput } from 'react-native-gesture-handler';
 
 const { width } = Dimensions.get('window');
 
-// --- COMPONENTE DE HEADER (Preservando sua Estética) ---
+// --- COMPONENTE DE HEADER ---
 function Header({ user }: { user: any }) {
   const router = useRouter();
   const avatarUri = typeof user?.foto_perfil === 'string' && user.foto_perfil.trim() ? user.foto_perfil : null;
@@ -70,7 +71,6 @@ export default function RoutinesAndWorkouts() {
   const loadData = async () => {
     try {
       setLoading(true);
-      // Carrega usuário e rotinas em paralelo para ganhar tempo
       const [userRes, routinesRes] = await Promise.all([
         api.get('/usuarios/me'),
         api.get('/alunos/minhas-rotinas')
@@ -84,7 +84,6 @@ export default function RoutinesAndWorkouts() {
     }
   };
 
-  // useFocusEffect garante que a lista atualize quando você volta da CreateRoutine
   useFocusEffect(
     useCallback(() => {
       loadData();
@@ -93,6 +92,45 @@ export default function RoutinesAndWorkouts() {
 
   const selectedRoutine = routines.find(r => r.id === openMenuId);
   const isProfessorRoutine = selectedRoutine?.criado_por_professor === true;
+
+  // --- LÓGICA DE EXCLUSÃO ---
+  const handleDelete = async (id: number) => {
+    console.log("🟢 BOTÃO CLICADO! Tentando deletar a ficha ID:", id);
+    
+    if (isProfessorRoutine) return;
+  
+    const performDelete = async () => {
+      try {
+        setLoading(true);
+        console.log(`📡 Enviando DELETE para /fichas/${id}...`);
+        await api.delete(`/fichas/${id}`);
+        
+        setRoutines(prev => prev.filter(r => r.id !== id));
+        setOpenMenuId(null);
+        console.log("✅ Deletado com sucesso!");
+      } catch (err) {
+        console.error("❌ Erro ao deletar:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    // Se for WEB, usa o confirm do navegador. Se for MOBILE, usa o Alert.alert
+    if (Platform.OS === 'web') {
+      if (window.confirm("Tem certeza que deseja apagar este treino?")) {
+        await performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Excluir Rotina",
+        "Tem certeza que deseja apagar este treino?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Excluir", style: "destructive", onPress: performDelete }
+        ]
+      );
+    }
+  };
 
   const handleEdit = (id: number) => {
     if (isProfessorRoutine) {
@@ -107,8 +145,6 @@ export default function RoutinesAndWorkouts() {
     if (!requestMessage.trim()) {
       return Alert.alert("Campo Vazio", "Descreva o que você deseja treinar.");
     }
-    // Aqui integraremos com a lógica de Notificação da Natália futuramente
-    console.log('Solicitação para professor:', requestMessage);
     setRequestMessage('');
     setShowRequestModal(false);
     Alert.alert("Sucesso", "Seu professor foi notificado!");
@@ -159,7 +195,6 @@ export default function RoutinesAndWorkouts() {
                   </TouchableOpacity>
                 )}
 
-                {/* SINCRO COM BACK-END: Usando item.titulo */}
                 <Text style={styles.cardTitle}>{item.titulo}</Text>
                 
                 <View style={styles.cardRow}>
@@ -193,22 +228,26 @@ export default function RoutinesAndWorkouts() {
             contentContainerStyle={styles.list}
           />
 
-          {/* MODAL DE OPÇÕES */}
+          {/* MODAL DE OPÇÕES ATUALIZADO */}
           <Modal visible={openMenuId !== null} transparent animationType="fade">
             <Pressable style={styles.modalBackdrop} onPress={() => setOpenMenuId(null)}>
               <View style={styles.modalContentCentered}>
                 <Text style={styles.modalAlertText}>Opções da Rotina</Text>
+                
                 <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleEdit(openMenuId!)}>
                   <Text style={styles.modalOptionText}>Editar rotina</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalOptionButton, { marginTop: 10 }]} onPress={() => setOpenMenuId(null)}>
+
+                <TouchableOpacity 
+                  style={[styles.modalOptionButton, { marginTop: 10 }]} 
+                  onPress={() => handleDelete(openMenuId!)} // <--- CHAMADA ADICIONADA
+                >
                   <Text style={[styles.modalOptionText, { color: colors.red }]}>Excluir rotina</Text>
                 </TouchableOpacity>
               </View>
             </Pressable>
           </Modal>
 
-          {/* MODAL DE SOLICITAÇÃO */}
           <Modal visible={showRequestModal} transparent animationType="slide">
             <Pressable style={styles.modalBackdrop} onPress={() => setShowRequestModal(false)}>
               <View style={styles.modalContentCentered}>
@@ -236,6 +275,7 @@ export default function RoutinesAndWorkouts() {
   );
 }
 
+// Estilos mantidos iguais...
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   header: {
