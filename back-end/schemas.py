@@ -2,12 +2,13 @@ from pydantic import BaseModel
 from datetime import date, datetime
 from typing import List, Optional
 
+# --- 1. USUÁRIOS E AUTH ---
 class UsuarioCreate(BaseModel):
     nome: str
     email: str
     senha: str
     data_nascimento: date
-    tipo_perfil: str
+    tipo_perfil: str # 'STUDENT' ou 'TEACHER'
 
 class UsuarioResponse(BaseModel):
     id: int
@@ -19,7 +20,14 @@ class UsuarioResponse(BaseModel):
 
 class UsuarioPerfilUpdate(BaseModel):
     nome: Optional[str] = None
-    foto_perfil: Optional[str] = None  # <--- ESSA LINHA É OBRIGATÓRIA AQUI!
+    foto_perfil: Optional[str] = None
+
+# --- 2. PERFIS ESPECÍFICOS ---
+class ProfessorCreate(BaseModel):
+    cref: str
+
+class AlunoCreate(BaseModel):
+    objetivo: str
 
 class AlunoObjetivoRead(BaseModel):
     objetivo: Optional[str] = None
@@ -27,22 +35,13 @@ class AlunoObjetivoRead(BaseModel):
 class AlunoObjetivoUpdate(BaseModel):
     objetivo: str
 
-# --- PERFIS ---
-class ProfessorCreate(BaseModel):
-    cref: str
-
-class AlunoCreate(BaseModel):
-    objetivo: str
-
 class AlunoMeResponse(BaseModel):
     id: int
     objetivo: Optional[str] = None
     professor_id: Optional[int] = None
+    class Config: from_attributes = True
 
-    class Config:
-        from_attributes = True
-
-# --- EVOLUÇÃO ---
+# --- 3. EVOLUÇÃO E MEDIDAS ---
 class EvolucaoCreate(BaseModel):
     peso: float
     porcentagem_gordura: Optional[float] = None
@@ -55,11 +54,8 @@ class EvolucaoResponse(BaseModel):
     peso: float
     porcentagem_gordura: Optional[float] = None
     massa_muscular: Optional[float] = None
+    class Config: from_attributes = True
 
-    class Config:
-        from_attributes = True
-
-# --- ALUNO COMPLETO ---
 class AlunoResponse(BaseModel):
     id: int
     objetivo: str
@@ -67,37 +63,40 @@ class AlunoResponse(BaseModel):
     historico_evolucao: List[EvolucaoResponse] = []
     class Config: from_attributes = True
 
-# --- FICHAS E EXERCÍCIOS ---
+# --- 4. SISTEMA DE TREINOS (Fichas e Exercícios) ---
 class ItemExercicioCreate(BaseModel):
-    exercicio_referencia_id: int
+    exercicio_referencia_id: str
     series: int
-    repeticoes: int
-    carga: float
+    # Mudamos para str para aceitar "12-15" ou "Até a falha"
+    repeticoes: str 
+    # Mudamos para str para aceitar "50kg" ou "10 placas"
+    carga: str      
     observacao: Optional[str] = None
 
 class FichaTreinoCreate(BaseModel):
-    aluno_id: int
+    # aluno_id removido daqui: pegamos pelo Token no Back-end por segurança
     titulo: str
     exercicios: List[ItemExercicioCreate]
 
 class ItemExercicioResponse(BaseModel):
     id: int
-    exercicio_referencia_id: int
+    exercicio_referencia_id: str
     series: int
-    repeticoes: int
-    carga: float
-    observacao: Optional[str]
+    repeticoes: str
+    carga: str
+    observacao: Optional[str] = None
     class Config: from_attributes = True
 
 class FichaTreinoResponse(BaseModel):
     id: int
     titulo: str
     status: str
-    criado_por_professor: bool # Integrado do código dela
-    exercicios: List[ItemExercicioResponse]
+    criado_por_professor: bool
+    data_criacao: Optional[datetime] = None
+    exercicios: List[ItemExercicioResponse] = []
     class Config: from_attributes = True
 
-# --- ROTINAS (Sua estrutura original preservada) ---
+# --- 5. ROTINAS (Estrutura de Listagem) ---
 class RotinaBase(BaseModel):
     title: str
     criado_por_professor: bool = False
@@ -109,9 +108,10 @@ class RotinaCreate(RotinaBase):
 class RotinaResponse(RotinaBase): 
     id: int
     aluno_id: int
+    data_criacao: Optional[datetime] = None
     class Config: from_attributes = True
 
-# --- NOTIFICAÇÕES E SOCIAL (Novos da Natália) ---
+# --- 6. SOCIAL E NOTIFICAÇÕES (Lógica Natália) ---
 class NotificacaoResponse(BaseModel):
     id: int
     titulo: str
@@ -119,8 +119,8 @@ class NotificacaoResponse(BaseModel):
     tipo: str
     status: str
     data_criacao: datetime
-    remetente_id: Optional[int]
-    referencia_id: Optional[int]
+    remetente_id: Optional[int] = None
+    referencia_id: Optional[int] = None
     remetente_foto: Optional[str] = None
     class Config: from_attributes = True
 
@@ -135,6 +135,4 @@ class FeedItem(BaseModel):
     titulo: str
     descricao: str
     data: datetime
-    
-    class Config:
-        from_attributes = True
+    class Config: from_attributes = True
