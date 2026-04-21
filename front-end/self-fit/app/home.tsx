@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { 
   SafeAreaView, 
   View, 
@@ -9,10 +9,11 @@ import {
   Dimensions, 
   FlatList, 
   ActivityIndicator,
-  RefreshControl // <--- Adicionado para o Pull-to-Refresh
+  RefreshControl 
 } from 'react-native';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons'; // Importado MaterialCommunityIcons
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native'; // Adicionado useFocusEffect
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api';
@@ -39,7 +40,7 @@ function formatarTempoRelativo(dataIso: string | Date | undefined) {
 export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false); // <--- Estado de refresh
+  const [refreshing, setRefreshing] = useState(false);
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [userData, setUserData] = useState({ nome: '', handle: '' });
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export default function Home() {
           setNotificacoesAtivas(countRes.data.contagem);
       } catch (e) { console.log("Erro Notificações"); }
 
-      // 3. Busca o Feed
+      // 3. Busca o Feed (Agora vindo com treinos e evoluções)
       const endpoint = tipo_perfil === 'TEACHER' ? '/professor/feed-alunos' : '/aluno/feed-amigos';
       const feedRes = await api.get(endpoint);
       setFeedPosts(feedRes.data);
@@ -78,16 +79,19 @@ export default function Home() {
     }
   }, []);
 
-  useEffect(() => {
-    syncHome();
-  }, [syncHome]);
+  // useFocusEffect garante que o feed atualize SEMPRE que você volta para esta tela
+  useFocusEffect(
+    useCallback(() => {
+      syncHome();
+    }, [syncHome])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
     syncHome();
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={[styles.safeArea, styles.centerContent]}>
         <ActivityIndicator size="large" color={colors.red} />
@@ -139,10 +143,10 @@ export default function Home() {
             </View>
           }
           renderItem={({ item }) => {
-            const fotoFeed =
-              typeof item.usuario_foto === 'string' && item.usuario_foto.trim().length > 0
+            const fotoFeed = typeof item.usuario_foto === 'string' && item.usuario_foto.trim().length > 0
                 ? item.usuario_foto.trim()
                 : null;
+
             return (
             <View style={styles.postCard}>
               <View style={styles.postHeader}>
@@ -156,8 +160,20 @@ export default function Home() {
                 </View>
                 <Text style={styles.postTime}>{formatarTempoRelativo(item.data)}</Text>
               </View>
-              <Text style={styles.postSubtitle}>{item.titulo}</Text>
-              <Text style={styles.workoutTitle}>{item.descricao}</Text>
+
+              <View style={styles.postBody}>
+                <View style={styles.typeIcon}>
+                   {item.tipo === 'TREINO' ? (
+                     <MaterialCommunityIcons name="arm-flex" size={22} color={colors.red} />
+                   ) : (
+                     <Ionicons name="trending-up" size={22} color={colors.green} />
+                   )}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.postSubtitle}>{item.titulo}</Text>
+                  <Text style={styles.workoutTitle}>{item.descricao}</Text>
+                </View>
+              </View>
             </View>
             );
           }}
@@ -194,11 +210,13 @@ const styles = StyleSheet.create({
   emptyContainer: { alignItems: 'center', marginTop: 50 },
   emptyText: { color: colors.gray, textAlign: 'center' },
   postCard: { backgroundColor: '#1A1A1A', padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: '#222' },
-  postHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  postHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   postAuthorRow: { flexDirection: 'row', alignItems: 'center' },
   postAvatar: { width: 30, height: 30, borderRadius: 15, marginRight: 8, backgroundColor: '#333' },
   postAuthor: { color: colors.white, fontWeight: 'bold', fontSize: 15 },
   postTime: { color: colors.gray, fontSize: 11 },
+  postBody: { flexDirection: 'row', alignItems: 'flex-start' },
+  typeIcon: { marginRight: 12, marginTop: 2 },
   postSubtitle: { color: colors.white, fontSize: 12, marginBottom: 4, opacity: 0.7 },
-  workoutTitle: { color: colors.red, fontWeight: 'bold', fontSize: 16 },
+  workoutTitle: { color: colors.red, fontWeight: 'bold', fontSize: 15, lineHeight: 20 },
 });

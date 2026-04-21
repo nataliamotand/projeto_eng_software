@@ -128,7 +128,7 @@ class RespostaNotificacao(BaseModel):
     acao: str # 'ACEITAR' ou 'RECUSAR'
 
 class FeedItem(BaseModel):
-    id: int
+    id: str
     tipo: str # 'TREINO', 'EVOLUCAO', 'SOCIAL'
     usuario_nome: str
     usuario_foto: Optional[str] = None

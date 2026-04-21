@@ -156,12 +156,55 @@ def seguir(destino_id: int, email: str = Depends(auth.obter_usuario_atual), db: 
 @app.get("/aluno/feed-amigos", response_model=List[schemas.FeedItem])
 def feed(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     meu_u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    seguidos = db.query(models.Seguidor.seguido_id).filter(models.Seguidor.seguidor_id == meu_u.id, models.Seguidor.status == "ACEITO").all()
-    ids = [s[0] for s in seguidos]
-    if not ids: return []
-    atividades = db.query(models.Evolucao).join(models.Aluno).filter(models.Aluno.usuario_id.in_(ids)).order_by(models.Evolucao.data_registro.desc()).limit(20).all()
-    return [{"id": a.id, "tipo": "EVOLUCAO", "usuario_nome": a.aluno.usuario.nome, "usuario_foto": a.aluno.usuario.foto_perfil, "titulo": "Nova marca!", "descricao": f"Peso: {a.peso}kg", "data": a.data_registro} for a in atividades]
+    
+    # 1. Pega os IDs de quem o Carlos segue
+    seguidos = db.query(models.Seguidor.seguido_id).filter(
+        models.Seguidor.seguidor_id == meu_u.id, 
+        models.Seguidor.status == "ACEITO"
+    ).all()
+    
+    ids_interesse = [s[0] for s in seguidos]
+    ids_interesse.append(meu_u.id) # Adiciona o próprio Carlos para ele ver suas postagens
 
+    # 2. Busca Evoluções (Medidas/Peso)
+    atividades_evo = db.query(models.Evolucao).join(models.Aluno).filter(
+        models.Aluno.usuario_id.in_(ids_interesse)
+    ).order_by(models.Evolucao.data_registro.desc()).limit(15).all()
+
+    # 3. Busca Treinos Realizados (A novidade!)
+    atividades_treino = db.query(models.TreinoRealizado).join(models.Aluno).filter(
+        models.Aluno.usuario_id.in_(ids_interesse)
+    ).order_by(models.TreinoRealizado.data_fim.desc()).limit(15).all()
+
+    # 4. Formata e unifica tudo no padrão FeedItem
+    lista_feed = []
+
+    for a in atividades_evo:
+        lista_feed.append({
+            "id": f"evo_{a.id}", # ID único para o Front
+            "tipo": "EVOLUCAO",
+            "usuario_nome": a.aluno.usuario.nome,
+            "usuario_foto": a.aluno.usuario.foto_perfil,
+            "titulo": "Atualizou o shape!",
+            "descricao": f"Nova marca de {a.peso}kg atingida.",
+            "data": a.data_registro
+        })
+
+    for t in atividades_treino:
+        lista_feed.append({
+            "id": f"tr_{t.id}",
+            "tipo": "TREINO",
+            "usuario_nome": t.aluno.usuario.nome,
+            "usuario_foto": t.aluno.usuario.foto_perfil,
+            "titulo": f"Treino concluído: {t.titulo}",
+            "descricao": f"Levantou {t.volume_total}kg em {t.duracao_minutos} minutos. Brabo! 💪",
+            "data": t.data_fim
+        })
+
+    # 5. Ordena a lista final pela data (mais recente primeiro)
+    lista_feed.sort(key=lambda x: x['data'], reverse=True)
+
+    return lista_feed[:30] # Retorna os 30 eventos mais recentes
 # --- 5. NOTIFICAÇÕES ---
 @app.get("/notificacoes", response_model=List[schemas.NotificacaoResponse])
 def listar_notif(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
