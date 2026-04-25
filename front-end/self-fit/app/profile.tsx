@@ -13,6 +13,8 @@ import {
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+// Importação necessária para limpar o token
+import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
@@ -86,6 +88,16 @@ export default function Profile() {
       cancelled = true;
     };
   }, []);
+
+  // Lógica de Logout: Limpa o token e redireciona de forma atômica
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('token');
+      router.replace('/welcome'); 
+    } catch (e) {
+      console.error("Erro ao deslogar:", e);
+    }
+  };
 
   const isTeacher = userProfile === 'TEACHER';
 
@@ -218,6 +230,18 @@ export default function Profile() {
                 <View style={styles.actionLeft}>
                   <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
                   <Text style={styles.actionText}>Métricas</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
+
+              {/* Botão de Logout integrado com a estética do projeto */}
+              <TouchableOpacity 
+                style={[styles.actionButton, { marginTop: 12 }]} 
+                onPress={handleLogout}
+              >
+                <View style={styles.actionLeft}>
+                  <Ionicons name="log-out-outline" size={18} color={colors.red} style={{ marginRight: 12 }} />
+                  <Text style={[styles.actionText, { color: colors.red }]}>Sair da Conta</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
               </TouchableOpacity>
