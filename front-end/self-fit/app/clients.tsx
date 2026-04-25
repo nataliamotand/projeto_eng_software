@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -16,6 +16,7 @@ import { FontAwesome, Ionicons, MaterialIcons, MaterialCommunityIcons } from '@e
 import { useRouter } from 'expo-router';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
+import api from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -43,8 +44,11 @@ const mockedClients = [
   },
 ];
 
-function Header() {
+function Header({ user }: { user: any }) {
   const router = useRouter();
+  const avatarUri = user?.foto_perfil ? String(user.foto_perfil) : null;
+  const nome = user?.nome || 'Professor';
+  const handle = user?.email?.split('@')?.[0] ? `@${user.email.split('@')[0]}` : '@prof';
 
   return (
     <View style={styles.header}>
@@ -52,11 +56,15 @@ function Header() {
 
       <View style={styles.headerLeft}>
         <View style={styles.avatar}>
-          <Image source={require('../assets/images/logo.png')} style={styles.avatarImage} resizeMode="contain" />
+          <Image
+            source={avatarUri ? { uri: avatarUri } : require('../assets/images/logo.png')}
+            style={styles.avatarImage}
+            resizeMode="contain"
+          />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName}>Professor João</Text>
-          <Text style={styles.userHandle}>@profjoao</Text>
+          <Text style={styles.userName}>{nome}</Text>
+          <Text style={styles.userHandle}>{handle}</Text>
         </View>
       </View>
 
@@ -119,9 +127,10 @@ function BottomNav() {
   );
 }
 
-export default function Clients(): JSX.Element {
+export default function Clients() {
   const [query, setQuery] = useState('');
   const [clients, setClients] = useState(mockedClients);
+  const [user, setUser] = useState<any>(null);
   const [openOptionsClientId, setOpenOptionsClientId] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState('');
@@ -141,9 +150,24 @@ export default function Clients(): JSX.Element {
 
   const router = useRouter();
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/usuarios/me');
+        if (!cancelled) setUser(res.data);
+      } catch {
+        if (!cancelled) setUser(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header />
+      <Header user={user} />
 
       <View style={styles.container}>
         <View style={styles.inner}>
@@ -183,9 +207,9 @@ export default function Clients(): JSX.Element {
                 renderItem={({ item }) => (
                   <View style={styles.userRow}>
                     <View style={styles.userLeft}>
-                      <Image source={item.avatar} style={styles.avatar} />
+                      <Image source={item.avatar} style={styles.suggestionAvatar} />
                       <View style={styles.userTexts}>
-                        <Text style={styles.userName}>{item.name}</Text>
+                        <Text style={styles.suggestionName}>{item.name}</Text>
                         <Text style={styles.userLogin}>@{item.username}</Text>
                       </View>
                     </View>
@@ -258,7 +282,7 @@ export default function Clients(): JSX.Element {
         </View>
       </View>
 
-      <StickyFooter active="clients" />
+      <StickyFooter active="clients" userProfile="TEACHER" />
     </SafeAreaView>
   );
 }
@@ -359,16 +383,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   userLeft: { flexDirection: 'row', alignItems: 'center' },
-  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#222' },
+  suggestionAvatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#222' },
   userTexts: { marginLeft: 12 },
-  userName: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  suggestionName: { color: colors.white, fontWeight: '700', fontSize: 15 },
   userLogin: { color: colors.grayText, fontSize: 13, marginTop: 4 },
   subtitleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
   userSubtitle: { color: colors.grayText, fontSize: 12 },
   miniAvatars: { width: 40, height: 20, marginLeft: 8, position: 'relative' },
   miniAvatar: { width: 24, height: 24, borderRadius: 12, position: 'absolute', borderWidth: 2, borderColor: colors.background },
   userRight: { flexDirection: 'row', alignItems: 'center' },
-  followButton: { backgroundColor: colors.red, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  followButton: { backgroundColor: colors.red, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
   followText: { color: colors.white, fontWeight: '700' },
   closeTouch: { marginLeft: 10, padding: 6 },
 
@@ -450,8 +474,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
-  followButton: { backgroundColor: colors.red, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-  followText: { color: colors.white, fontWeight: '700' },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
