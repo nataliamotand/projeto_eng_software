@@ -13,7 +13,6 @@ import {
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-// Importação necessária para gerir o token de acesso
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
@@ -22,7 +21,6 @@ import api from '../src/services/api';
 
 const { width } = Dimensions.get('window');
 
-// Configuração de localização para o calendário em Português
 LocaleConfig.locales['pt'] = {
   monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
   monthNamesShort: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
@@ -34,7 +32,6 @@ LocaleConfig.defaultLocale = 'pt';
 
 const defaultAvatar = require('../assets/images/logo.png');
 
-// Função auxiliar para gerar o handle do utilizador
 function buildHandle(nome: string): string {
   return nome.toLowerCase().replace(/\s/g, '');
 }
@@ -44,13 +41,12 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Estados do Perfil de Utilizador
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [nome, setNome] = useState('');
   const [handle, setHandle] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  // Estados Dinâmicos de Dados (Linkagem Real com o Banco)
+  // ESTADOS DINÂMICOS VINDOS DO BACK-END
   const [trainingsCount, setTrainingsCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -63,7 +59,6 @@ export default function Profile() {
         setLoading(true);
         setError(null);
         
-        // Chamadas paralelas para otimizar o tempo de resposta
         const [res, historyRes] = await Promise.all([
           api.get('/usuarios/me'),
           api.get('/alunos/historico-treinos')
@@ -71,14 +66,14 @@ export default function Profile() {
 
         if (cancelled) return;
         
-        // Atribuição dos dados vindos do Back-end
         const { 
           nome: n, 
           tipo_perfil, 
           email, 
           foto_perfil, 
           seguidores_count, 
-          seguindo_count 
+          seguindo_count,
+          treinos_count // Novo campo linkado
         } = res.data;
         
         setNome(n);
@@ -86,8 +81,8 @@ export default function Profile() {
         setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
         setAvatarUri(foto_perfil ? String(foto_perfil) : null);
 
-        // Atualização das estatísticas dinâmicas
-        setTrainingsCount(historyRes.data.length);
+        // ATRIBUIÇÃO DINÂMICA COMPLETA
+        setTrainingsCount(treinos_count || 0);
         setFollowersCount(seguidores_count || 0);
         setFollowingCount(seguindo_count || 0);
         setWorkoutHistory(historyRes.data);

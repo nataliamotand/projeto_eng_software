@@ -16,9 +16,10 @@ class UsuarioResponse(BaseModel):
     email: str
     tipo_perfil: str
     foto_perfil: Optional[str] = None
-    # Mantemos como int para garantir a tipagem correta no Front-end
+    # ALTERADO: Campos de contagem para linkagem social e treinos
     seguidores_count: int = 0
     seguindo_count: int = 0
+    treinos_count: int = 0
     
     class Config: from_attributes = True
 

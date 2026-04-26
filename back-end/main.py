@@ -70,19 +70,17 @@ def ler_me(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    # 1. Contagem de quem segue o usuário logado (Seguidores)
-    seguidores = db.query(models.Seguidor).filter(
-        models.Seguidor.seguido_id == user.id, 
-        models.Seguidor.status == "ACEITO"
-    ).count()
+    # 1. Contagem de Seguidores/Seguindo
+    seguidores = db.query(models.Seguidor).filter(models.Seguidor.seguido_id == user.id, models.Seguidor.status == "ACEITO").count()
+    seguindo = db.query(models.Seguidor).filter(models.Seguidor.seguidor_id == user.id, models.Seguidor.status == "ACEITO").count()
     
-    # 2. Contagem de quem o usuário logado está seguindo (Seguindo)
-    seguindo = db.query(models.Seguidor).filter(
-        models.Seguidor.seguidor_id == user.id, 
-        models.Seguidor.status == "ACEITO"
-    ).count()
+    # 2. LÓGICA DE TREINAMENTOS: Conta registos na tabela treinos_realizados
+    treinos = 0
+    if user.perfil_aluno:
+        treinos = db.query(models.TreinoRealizado).filter(
+            models.TreinoRealizado.aluno_id == user.perfil_aluno.id
+        ).count()
     
-    # 3. Retornamos um dicionário explícito para garantir a linkagem
     return {
         "id": user.id,
         "nome": user.nome,
@@ -90,7 +88,8 @@ def ler_me(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends
         "tipo_perfil": user.tipo_perfil,
         "foto_perfil": user.foto_perfil,
         "seguidores_count": seguidores,
-        "seguindo_count": seguindo
+        "seguindo_count": seguindo,
+        "treinos_count": treinos # Agora dinâmico!
     }
 
 
