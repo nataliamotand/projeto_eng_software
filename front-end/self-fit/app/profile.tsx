@@ -140,7 +140,14 @@ export default function Profile() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Header title="Perfil" />
+        <Header
+          title="Perfil"
+          right={
+            <TouchableOpacity onPress={() => { router.push('/edit_profile'); }}>
+              <Ionicons name="settings-outline" size={22} color={colors.white} />
+            </TouchableOpacity>
+          }
+        />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.red} />
         </View>

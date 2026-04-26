@@ -279,7 +279,7 @@ export default function EditProfile() {
 
 
 
- 
+
 
 
 
@@ -335,9 +335,9 @@ export default function EditProfile() {
 
                   : avatarUri
 
-                  ? { uri: String(avatarUri) }
+                    ? { uri: String(avatarUri) }
 
-                  : require('../assets/images/logo.png')
+                    : require('../assets/images/logo.png')
 
               }
 
