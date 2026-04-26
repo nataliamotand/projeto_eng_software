@@ -27,10 +27,11 @@ with engine.begin() as conn:
 app = FastAPI(title="API Self-Fit - Sistema Total Integrado")
 
 app.add_middleware(
-    CORSMiddleware, 
-    allow_origins=["*"], 
-    allow_methods=["*"], 
-    allow_headers=["*"]
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],  # <--- ISSO DEVE SER ["*"] OU TER "DELETE" NA LISTA
+    allow_headers=["*"],
 )
 
 def get_db():
@@ -259,27 +260,76 @@ def listar_meus_alunos(email: str = Depends(auth.obter_usuario_atual), db: Sessi
     alunos = db.query(models.Aluno).filter(models.Aluno.professor_id == u.perfil_professor.id).all()
     return [{"id": a.id, "nome": a.usuario.nome, "email": a.usuario.email, "username": a.usuario.email.split("@")[0], "foto_perfil": a.usuario.foto_perfil, "objetivo": a.objetivo} for a in alunos]
 
+# No main.py, localize e substitua este endpoint:
+
 @app.get("/professor/descobrir-alunos")
 def descobrir_alunos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    """
+    Lista apenas alunos 'órfãos' (sem professor associado).
+    Isso garante que o professor só veja quem está disponível para consultoria.
+    """
+    # 1. Busca o professor logado (apenas para garantir que ele é TEACHER)
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    alunos = db.query(models.Aluno).filter((models.Aluno.professor_id == None) | (models.Aluno.professor_id != u.perfil_professor.id)).all()
-    return [{"id": a.id, "nome": a.usuario.nome, "foto_perfil": a.usuario.foto_perfil, "objetivo": a.objetivo} for a in alunos]
+    if not u.perfil_professor:
+        raise HTTPException(status_code=403, detail="Acesso restrito a professores.")
+
+    # 2. Query filtrando estritamente por professor_id NULL
+    alunos_disponiveis = db.query(models.Aluno).filter(
+        models.Aluno.professor_id == None
+    ).all()
+
+    # 3. Formata o retorno para o Front-end
+    return [
+        {
+            "id": a.id, 
+            "nome": a.usuario.nome, 
+            "foto_perfil": a.usuario.foto_perfil, 
+            "objetivo": a.objetivo
+        } for a in alunos_disponiveis
+    ]
 
 @app.put("/professor/vincular-aluno/{aluno_id}")
 def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
+    
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+    
+    # TRAVA DE SEGURANÇA: Se o aluno já tiver professor, impede o novo vínculo
+    if aluno.professor_id is not None:
+        raise HTTPException(
+            status_code=400, 
+            detail="Este aluno já possui um professor associado."
+        )
+
     aluno.professor_id = u.perfil_professor.id
-    db.commit(); return {"status": "ok"}
+    db.commit()
+    return {"status": "ok", "message": f"Aluno {aluno.usuario.nome} vinculado com sucesso!"}
 
 @app.delete("/professor/desvincular-aluno/{aluno_id}")
 def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    """Remove o vínculo entre professor e aluno"""
+    # 1. Identifica o professor logado
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id, models.Aluno.professor_id == u.perfil_professor.id).first()
-    if not aluno: raise HTTPException(status_code=404, detail="Vínculo não encontrado.")
+    
+    # 2. Busca o aluno
+    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
+    
+    if not aluno:
+        print(f"❌ Erro: Aluno {aluno_id} não encontrado.")
+        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+
+    # 3. Quebra o vínculo (volta para NULL)
     aluno.professor_id = None
-    db.commit(); return {"status": "vínculo removido"}
+    
+    try:
+        db.commit()
+        print(f"✅ SUCESSO: Aluno {aluno_id} agora está órfão (sem professor).")
+        return {"message": "Desvinculado"}
+    except Exception as e:
+        db.rollback()
+        print(f"🔥 Erro no commit: {e}")
+        raise HTTPException(status_code=500)
 
 @app.get("/professor/aluno/{aluno_id}/historico", response_model=List[schemas.TreinoFinalizadoResponse])
 def ver_historico_aluno_prof(aluno_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
