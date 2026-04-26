@@ -21,17 +21,15 @@ with engine.begin() as conn:
     conn.execute(text("ALTER TABLE itens_exercicio ALTER COLUMN carga TYPE VARCHAR USING carga::varchar"))
     conn.execute(text("ALTER TABLE itens_exercicio ALTER COLUMN exercicio_referencia_id TYPE VARCHAR USING exercicio_referencia_id::varchar"))
 
-    conn.execute(text("ALTER TABLE rotinas ADD COLUMN IF NOT EXISTS data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
-    conn.execute(text("ALTER TABLE rotinas ADD COLUMN IF NOT EXISTS criado_por_professor BOOLEAN DEFAULT FALSE"))
+    conn.execute(text("ALTER TABLE professores ADD COLUMN IF NOT EXISTS especialidade VARCHAR"))
 
 app = FastAPI(title="API Self-Fit - Sistema Total Integrado")
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],  # <--- ISSO DEVE SER ["*"] OU TER "DELETE" NA LISTA
-    allow_headers=["*"],
+    CORSMiddleware, 
+    allow_origins=["*"], 
+    allow_methods=["*"], 
+    allow_headers=["*"]
 )
 
 def get_db():
@@ -129,6 +127,30 @@ def listar_minhas_rotinas(email: str = Depends(auth.obter_usuario_atual), db: Se
     if not u or not u.perfil_aluno: return []
     return db.query(models.FichaTreino).options(joinedload(models.FichaTreino.exercicios)).filter(models.FichaTreino.aluno_id == u.perfil_aluno.id).order_by(models.FichaTreino.data_criacao.desc()).all()
 
+@app.get("/alunos/me", response_model=schemas.AlunoMeResponse)
+def obter_perfil_aluno(
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db)
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_aluno:
+        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
+    return u.perfil_aluno
+
+@app.put("/alunos/me/objetivo", response_model=schemas.AlunoObjetivoRead)
+def atualizar_objetivo(
+    dados: schemas.AlunoObjetivoUpdate,
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db)
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_aluno:
+        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
+    u.perfil_aluno.objetivo = dados.objetivo
+    db.commit()
+    db.refresh(u.perfil_aluno)
+    return u.perfil_aluno
+
 # --- 3. EXECUÇÃO, EVOLUÇÃO E HISTÓRICO ---
 
 @app.post("/alunos/finalizar-treino")
@@ -163,6 +185,16 @@ def listar_historico_treinos(email: str = Depends(auth.obter_usuario_atual), db:
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if not u.perfil_aluno: return []
     return db.query(models.TreinoRealizado).options(joinedload(models.TreinoRealizado.exercicios)).filter(models.TreinoRealizado.aluno_id == u.perfil_aluno.id).order_by(models.TreinoRealizado.data_fim.desc()).all()
+
+@app.get("/alunos/me", response_model=schemas.AlunoMeResponse)
+def obter_perfil_aluno(
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db)
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_aluno:
+        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
+    return u.perfil_aluno
 
 # --- 4. SOCIAL E FEED ---
 
@@ -260,76 +292,27 @@ def listar_meus_alunos(email: str = Depends(auth.obter_usuario_atual), db: Sessi
     alunos = db.query(models.Aluno).filter(models.Aluno.professor_id == u.perfil_professor.id).all()
     return [{"id": a.id, "nome": a.usuario.nome, "email": a.usuario.email, "username": a.usuario.email.split("@")[0], "foto_perfil": a.usuario.foto_perfil, "objetivo": a.objetivo} for a in alunos]
 
-# No main.py, localize e substitua este endpoint:
-
 @app.get("/professor/descobrir-alunos")
 def descobrir_alunos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    """
-    Lista apenas alunos 'órfãos' (sem professor associado).
-    Isso garante que o professor só veja quem está disponível para consultoria.
-    """
-    # 1. Busca o professor logado (apenas para garantir que ele é TEACHER)
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    if not u.perfil_professor:
-        raise HTTPException(status_code=403, detail="Acesso restrito a professores.")
-
-    # 2. Query filtrando estritamente por professor_id NULL
-    alunos_disponiveis = db.query(models.Aluno).filter(
-        models.Aluno.professor_id == None
-    ).all()
-
-    # 3. Formata o retorno para o Front-end
-    return [
-        {
-            "id": a.id, 
-            "nome": a.usuario.nome, 
-            "foto_perfil": a.usuario.foto_perfil, 
-            "objetivo": a.objetivo
-        } for a in alunos_disponiveis
-    ]
+    alunos = db.query(models.Aluno).filter((models.Aluno.professor_id == None) | (models.Aluno.professor_id != u.perfil_professor.id)).all()
+    return [{"id": a.id, "nome": a.usuario.nome, "foto_perfil": a.usuario.foto_perfil, "objetivo": a.objetivo} for a in alunos]
 
 @app.put("/professor/vincular-aluno/{aluno_id}")
 def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
-    
-    if not aluno:
-        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
-    
-    # TRAVA DE SEGURANÇA: Se o aluno já tiver professor, impede o novo vínculo
-    if aluno.professor_id is not None:
-        raise HTTPException(
-            status_code=400, 
-            detail="Este aluno já possui um professor associado."
-        )
-
     aluno.professor_id = u.perfil_professor.id
-    db.commit()
-    return {"status": "ok", "message": f"Aluno {aluno.usuario.nome} vinculado com sucesso!"}
+    db.commit(); return {"status": "ok"}
 
 @app.delete("/professor/desvincular-aluno/{aluno_id}")
 def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    # 1. Identifica o professor logado
+    """Remove o vínculo entre professor e aluno"""
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    
-    # 2. Busca o aluno
-    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
-    
-    if not aluno:
-        print(f"❌ Erro: Aluno {aluno_id} não encontrado.")
-        raise HTTPException(status_code=404, detail="Aluno não encontrado.")
-
-    # 3. Quebra o vínculo (volta para NULL)
+    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id, models.Aluno.professor_id == u.perfil_professor.id).first()
+    if not aluno: raise HTTPException(status_code=404, detail="Vínculo não encontrado.")
     aluno.professor_id = None
-    
-    try:
-        db.commit()
-        print(f"✅ SUCESSO: Aluno {aluno_id} agora está órfão (sem professor).")
-        return {"message": "Desvinculado"}
-    except Exception as e:
-        db.rollback()
-        print(f"🔥 Erro no commit: {e}")
-        raise HTTPException(status_code=500)
+    db.commit(); return {"status": "vínculo removido"}
 
 @app.get("/professor/aluno/{aluno_id}/historico", response_model=List[schemas.TreinoFinalizadoResponse])
 def ver_historico_aluno_prof(aluno_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
@@ -356,57 +339,3 @@ def feed_professor(email: str = Depends(auth.obter_usuario_atual), db: Session =
     for t in treinos: res.append({"id": f"pe_tr_{t.id}", "tipo": "TREINO", "usuario_nome": t.aluno.usuario.nome, "usuario_foto": t.aluno.usuario.foto_perfil, "titulo": f"Treino Concluído: {t.titulo}", "descricao": f"Levantou {t.volume_total}kg.", "data": t.data_fim})
     res.sort(key=lambda x: x['data'], reverse=True)
     return res[:30]
-
-@app.get("/treinos/detalhes/{treino_id}", response_model=schemas.TreinoFinalizadoResponse)
-def obter_detalhes_treino_universal(treino_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
-    # 1. Quem está pedindo?
-    requisitante = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    
-    # 2. Busca o treino
-    treino = db.query(models.TreinoRealizado).options(
-        joinedload(models.TreinoRealizado.exercicios)
-    ).filter(models.TreinoRealizado.id == treino_id).first()
-    
-    if not treino:
-        raise HTTPException(status_code=404, detail="Treino não encontrado.")
-
-    # 3. VALIDAÇÃO DE SEGURANÇA
-    dono_do_treino_id = treino.aluno.usuario_id
-    
-    # Se for o próprio dono, ou o professor dele, ou um seguidor aceito, permite ver.
-    is_owner = requisitante.id == dono_do_treino_id
-    is_professor = requisitante.tipo_perfil == "TEACHER" and treino.aluno.professor_id == requisitante.perfil_professor.id
-    
-    is_follower = db.query(models.Seguidor).filter(
-        models.Seguidor.seguidor_id == requisitante.id,
-        models.Seguidor.seguido_id == dono_do_treino_id,
-        models.Seguidor.status == "ACEITO"
-    ).first()
-
-    if not (is_owner or is_professor or is_follower):
-        raise HTTPException(status_code=403, detail="Você não tem permissão para ver os detalhes deste treino.")
-
-    return treino
-
-# --- 6.6 GESTÃO DE FICHAS PARA O PROFESSOR ---
-
-@app.get("/professor/fichas/modelos", response_model=List[schemas.FichaTreinoResponse])
-def listar_modelos_fichas_professor(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    """Retorna todas as fichas que este professor já criou (templates)"""
-    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    # Buscamos fichas criadas pelo professor (independente do aluno, ou modelos genéricos)
-    return db.query(models.FichaTreino).options(joinedload(models.FichaTreino.exercicios)).filter(
-        models.FichaTreino.criado_por_professor == True
-    ).all()
-
-@app.get("/professor/fichas/solicitacoes", response_model=List[schemas.RotinaResponse])
-def listar_solicitacoes_pendentes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    """Busca alunos vinculados que estão com status 'pending' em suas rotinas"""
-    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    prof_id = u.perfil_professor.id
-    
-    # Busca rotinas pendentes de alunos que pertencem a este professor
-    return db.query(models.Rotina).join(models.Aluno).filter(
-        models.Aluno.professor_id == prof_id,
-        models.Rotina.status == "pending"
-    ).all()
