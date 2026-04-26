@@ -2,7 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Estilização da barra de rolagem para navegadores (Chrome, Edge, Safari) */
+/* 1. PREVENÇÃO DE "FLASH BRANCO" */
+/* Garante que o navegador renderize preto antes mesmo do JS carregar */
+html, body {
+  background-color: #000 !important;
+  margin: 0;
+  padding: 0;
+}
+
+/* 2. REMOÇÃO DA CAIXA DE FOCO "FEIA" */
+/* Remove o contorno padrão (outline) dos inputs no Chrome/Edge/Safari */
+*:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+input:focus, textarea:focus, [contenteditable="true"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  /* Mantém a cor da borda original para não haver o "pulo" visual */
+  border-color: inherit !important; 
+}
+
+/* 3. ESTILIZAÇÃO DA BARRA DE ROLAGEM */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -17,10 +39,10 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #CC0000; /* Destaque em vermelho Self-Fit ao passar o mouse */
+  background: #CC0000; /* Destaque em vermelho Self-Fit */
 }
 
-/* Para Firefox */
+/* Suporte para Firefox */
 * {
   scrollbar-width: thin;
   scrollbar-color: #333 #000;
