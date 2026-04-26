@@ -13,7 +13,7 @@ import {
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
@@ -22,10 +22,10 @@ import api from '../src/services/api';
 const { width } = Dimensions.get('window');
 
 LocaleConfig.locales['pt'] = {
-  monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
-  monthNamesShort: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
-  dayNames: ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'],
-  dayNamesShort: ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],
+  monthNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+  monthNamesShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+  dayNames: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
+  dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
   today: 'Hoje'
 };
 LocaleConfig.defaultLocale = 'pt';
@@ -40,7 +40,7 @@ export default function Profile() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [nome, setNome] = useState('');
   const [handle, setHandle] = useState('');
@@ -58,24 +58,24 @@ export default function Profile() {
       try {
         setLoading(true);
         setError(null);
-        
+
         const [res, historyRes] = await Promise.all([
           api.get('/usuarios/me'),
           api.get('/alunos/historico-treinos')
         ]);
 
         if (cancelled) return;
-        
-        const { 
-          nome: n, 
-          tipo_perfil, 
-          email, 
-          foto_perfil, 
-          seguidores_count, 
+
+        const {
+          nome: n,
+          tipo_perfil,
+          email,
+          foto_perfil,
+          seguidores_count,
           seguindo_count,
           treinos_count // Novo campo linkado
         } = res.data;
-        
+
         setNome(n);
         setUserProfile(tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
         setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
@@ -100,7 +100,7 @@ export default function Profile() {
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('token');
-      router.replace('/welcome'); 
+      router.replace('/welcome');
     } catch (e) {
       console.error("Erro ao deslogar:", e);
     }
@@ -150,13 +150,14 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header title="Perfil" />
-
-      <View style={styles.settingsWrap}>
-        <TouchableOpacity onPress={() => { router.push('/edit_profile'); }} style={styles.iconTouch}>
-          <Ionicons name="settings-outline" size={22} color={colors.white} />
-        </TouchableOpacity>
-      </View>
+      <Header
+        title="Perfil"
+        right={
+          <TouchableOpacity onPress={() => { router.push('/edit_profile'); }}>
+            <Ionicons name="settings-outline" size={22} color={colors.white} />
+          </TouchableOpacity>
+        }
+      />
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200, flexGrow: 1 }}>
         <View style={[styles.profileCard, isTeacher && styles.profileCardTeacher]}>
@@ -253,7 +254,6 @@ export default function Profile() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  settingsWrap: { position: 'absolute', right: 16, top: 64, zIndex: 20 },
   iconTouch: { marginLeft: 12 },
   container: { flex: 1 },
   profileCard: { backgroundColor: colors.background, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 18, flexDirection: 'row', alignItems: 'center' },

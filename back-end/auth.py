@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from jose import jwt
-from passlib.context import CryptContext
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
@@ -9,19 +9,16 @@ SECRET_KEY = "chave-super-secreta-do-self-fit"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # O crachá dura 7 dias
 
-# Dizendo para o Python usar o algoritmo bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 # Diz pro FastAPI que a rota de pegar o crachá é a "/login"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def gerar_hash_senha(senha: str):
     """Transforma a senha pura num texto ilegível"""
-    return pwd_context.hash(senha)
+    return bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verificar_senha(senha_pura: str, senha_hash: str):
     """Compara a senha digitada com a do banco"""
-    return pwd_context.verify(senha_pura, senha_hash)
+    return bcrypt.checkpw(senha_pura.encode('utf-8'), senha_hash.encode('utf-8'))
 
 def criar_token_acesso(dados: dict):
     """Gera o Token JWT de acesso"""

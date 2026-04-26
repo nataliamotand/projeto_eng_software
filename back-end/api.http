@@ -1,0 +1,261 @@
+@base_url = http://127.0.0.1:8000
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJqb2FvQGV4ZW1wbG8uY29tIiwicGVyZmlsIjoiU1RVREVOVCIsImV4cCI6MTc3NzgzNTAzMH0.FK5GFn9f6yFywZA4nQWNNYEsI_qsiICSuJIHRvejnIk
+
+### 1. USUÁRIOS E AUTH
+
+# Cadastrar Novo Usuário (Aluno)
+POST {{base_url}}/usuarios
+Content-Type: application/json
+
+{
+  "nome": "João Aluno",
+  "email": "joao@exemplo.com",
+  "senha": "senhaforte123",
+  "data_nascimento": "1995-10-15",
+  "tipo_perfil": "STUDENT"
+}
+
+###
+
+# Cadastrar Novo Usuário (Professor)
+POST {{base_url}}/usuarios
+Content-Type: application/json
+
+{
+  "nome": "Maria Professora",
+  "email": "maria@exemplo.com",
+  "senha": "senhaforte123",
+  "data_nascimento": "1988-05-20",
+  "tipo_perfil": "TEACHER"
+}
+
+###
+
+# Login (Gera o Token JWT)
+# Copie o access_token gerado e cole na variável @token lá em cima
+POST {{base_url}}/login
+Content-Type: application/x-www-form-urlencoded
+
+username=joao@exemplo.com&password=senhaforte123
+
+###
+
+# Ver Meu Perfil
+GET {{base_url}}/usuarios/me
+Authorization: Bearer {{token}}
+
+###
+
+# Atualizar Meu Perfil
+PUT {{base_url}}/usuarios/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "João Aluno Atualizado",
+  "foto_perfil": "https://url-da-foto.com/foto.jpg"
+}
+
+
+### 2. GESTÃO DE FICHAS E TREINOS
+
+# Criar Ficha de Treino
+POST {{base_url}}/fichas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Treino A - Peito e Tríceps",
+  "exercicios": [
+    {
+      "exercicio_referencia_id": "supino_reto",
+      "series": 4,
+      "repeticoes": "10-12",
+      "carga": "20",
+      "observacao": "Focar na cadência"
+    }
+  ]
+}
+
+###
+
+# Listar Minhas Rotinas (Fichas)
+GET {{base_url}}/alunos/minhas-rotinas
+Authorization: Bearer {{token}}
+
+###
+
+# Obter Detalhes de uma Ficha Específica (Mude o ID)
+GET {{base_url}}/fichas/1
+Authorization: Bearer {{token}}
+
+###
+
+# Atualizar Ficha de Treino (Mude o ID)
+PUT {{base_url}}/fichas/1
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Treino A - Peito e Tríceps Atualizado",
+  "exercicios": [
+    {
+      "exercicio_referencia_id": "supino_reto",
+      "series": 4,
+      "repeticoes": "8-10",
+      "carga": "25",
+      "observacao": "Aumentar peso"
+    }
+  ]
+}
+
+###
+
+# Deletar Ficha (Mude o ID)
+DELETE {{base_url}}/fichas/1
+Authorization: Bearer {{token}}
+
+###
+
+# Obter objetivo do aluno
+GET {{base_url}}/alunos/me
+Authorization: Bearer {{token}}
+
+###
+
+# Atualizar objetivo do aluno
+PUT {{base_url}}/alunos/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "objetivo": "Emagrecimento",
+  "nivel_atual": "Iniciante"
+}
+
+###
+
+# Finalizar Treino (Registrar execução)
+POST {{base_url}}/alunos/finalizar-treino
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "titulo": "Treino A - Peito e Tríceps",
+  "duracao_minutos": 45,
+  "volume_total": 2400.0,
+  "exercicios": [
+    {
+      "nome": "Supino Reto",
+      "series": 4,
+      "repeticoes": "10",
+      "carga": "20"
+    }
+  ]
+}
+
+###
+
+# Histórico de Treinos Finalizados
+GET {{base_url}}/alunos/historico-treinos
+Authorization: Bearer {{token}}
+
+
+### 3. EVOLUÇÃO CORPORAL
+
+# Registrar Evolução (Peso/Medidas)
+POST {{base_url}}/alunos/evolucao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "peso": 75.5,
+  "porcentagem_gordura": 15.2,
+  "massa_muscular": 35.0
+}
+
+###
+
+# Ver Meu Histórico de Evolução
+GET {{base_url}}/alunos/meu-historico
+Authorization: Bearer {{token}}
+
+
+### 4. SOCIAL E FEED
+
+# Descobrir Outros Usuários (Alunos)
+GET {{base_url}}/usuarios/descobrir
+Authorization: Bearer {{token}}
+
+###
+
+# Seguir Usuário (Mude o ID de destino)
+POST {{base_url}}/usuarios/seguir/2
+Authorization: Bearer {{token}}
+
+###
+
+# Ver Feed de Amigos
+GET {{base_url}}/aluno/feed-amigos
+Authorization: Bearer {{token}}
+
+###
+
+# Listar Notificações Pendentes
+GET {{base_url}}/notificacoes
+Authorization: Bearer {{token}}
+
+###
+
+# Contagem de Notificações
+GET {{base_url}}/notificacoes/contagem
+Authorization: Bearer {{token}}
+
+###
+
+# Responder Notificação (Mude o ID e a ação para ACEITAR ou RECUSAR)
+PUT {{base_url}}/notificacoes/1/responder
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "acao": "ACEITAR"
+}
+
+
+### 5. ROTAS EXCLUSIVAS DO PROFESSOR
+# ATENÇÃO: As requisições abaixo exigem que o token seja de um usuário com tipo_perfil = "TEACHER"
+
+# Listar Meus Alunos
+GET {{base_url}}/professor/alunos
+Authorization: Bearer {{token}}
+
+###
+
+# Descobrir Alunos (Não vinculados)
+GET {{base_url}}/professor/descobrir-alunos
+Authorization: Bearer {{token}}
+
+###
+
+# Vincular Aluno (Mude o ID)
+PUT {{base_url}}/professor/vincular-aluno/1
+Authorization: Bearer {{token}}
+
+###
+
+# Ver Histórico de Treinos de um Aluno
+GET {{base_url}}/professor/aluno/1/historico
+Authorization: Bearer {{token}}
+
+###
+
+# Ver Perfil Detalhado de um Aluno
+GET {{base_url}}/professor/aluno/1/perfil
+Authorization: Bearer {{token}}
+
+###
+
+# Ver Feed de Atualizações dos Meus Alunos
+GET {{base_url}}/professor/feed-alunos
+Authorization: Bearer {{token}}

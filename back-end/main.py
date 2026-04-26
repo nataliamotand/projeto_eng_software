@@ -53,7 +53,21 @@ def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_
         nome=usuario.nome, email=usuario.email, senha=auth.gerar_hash_senha(usuario.senha),
         data_nascimento=usuario.data_nascimento, tipo_perfil=usuario.tipo_perfil
     )
-    db.add(db_usuario); db.commit(); db.refresh(db_usuario)
+    db.add(db_usuario)
+    db.commit()
+    db.refresh(db_usuario)
+    
+    # Criar o perfil específico correspondente
+    if usuario.tipo_perfil == "STUDENT":
+        perfil = models.Aluno(usuario_id=db_usuario.id, objetivo="")
+        db.add(perfil)
+        db.commit()
+    elif usuario.tipo_perfil == "TEACHER":
+        perfil = models.Professor(usuario_id=db_usuario.id, cref="")
+        db.add(perfil)
+        db.commit()
+        
+    db.refresh(db_usuario)
     return db_usuario
 
 @app.post("/login")
@@ -139,6 +153,21 @@ def deletar_ficha(ficha_id: int, db: Session = Depends(get_db), email: str = Dep
     ficha = db.query(models.FichaTreino).filter(models.FichaTreino.id == ficha_id, models.FichaTreino.aluno_id == u.perfil_aluno.id).first()
     if not ficha: raise HTTPException(status_code=404, detail="Não encontrado.")
     db.delete(ficha); db.commit(); return None
+
+@app.get("/alunos/me")
+def ler_aluno_me(db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    aluno = db.query(models.Aluno).filter(models.Aluno.usuario_id == u.id).first()
+    if not aluno: raise HTTPException(status_code=404, detail="Objetivo não encontrado.")
+    return aluno
+
+@app.put("/alunos/me/objetivo")
+def atualizar_aluno_me(dados: schemas.AlunoObjetivoUpdate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    aluno = db.query(models.Aluno).filter(models.Aluno.usuario_id == u.id).first()
+    if dados.objetivo is not None:
+        aluno.objetivo = dados.objetivo
+    db.commit(); db.refresh(aluno); return aluno
 
 # --- 3. EXECUÇÃO E HISTÓRICO DE TREINOS ---
 @app.post("/alunos/finalizar-treino")

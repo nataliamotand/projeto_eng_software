@@ -46,6 +46,9 @@ class AlunoMeResponse(BaseModel):
     professor_id: Optional[int] = None
     class Config: from_attributes = True
 
+class AlunoObjetivoUpdate(BaseModel):
+    objetivo: Optional[str] = None
+
 # --- 3. EVOLUÇÃO E MEDIDAS ---
 class EvolucaoCreate(BaseModel):
     peso: float

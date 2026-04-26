@@ -35,8 +35,8 @@ const mockedWorkouts = [
   { date: '2026-12-24', title: 'Core' },
 ];
 
-const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const monthShorts = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const monthShorts = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 function buildMap(list: { date: string; title?: string }[]) {
   const m: Record<string, { date: string; title?: string }> = {};
@@ -216,7 +216,7 @@ function MultiYearView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
   );
 }
 
-export default function CalendarScreen(): JSX.Element {
+export default function CalendarScreen() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'month' | 'year' | 'multi-year'>('month');
   const [showModeMenu, setShowModeMenu] = useState(false);
@@ -250,15 +250,6 @@ export default function CalendarScreen(): JSX.Element {
             </View>
           </TouchableOpacity>
         )}
-
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => { /* TODO: share */ }} style={styles.iconTouch}>
-            <Ionicons name="share-social" size={20} color={colors.white} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => { /* TODO: filter */ }} style={styles.iconTouch}>
-            <Ionicons name="options" size={20} color={colors.white} />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 80 }}>
