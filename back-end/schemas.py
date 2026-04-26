@@ -46,6 +46,15 @@ class AlunoMeResponse(BaseModel):
     professor_id: Optional[int] = None
     class Config: from_attributes = True
 
+class ProfessorMeResponse(BaseModel):
+    id: int
+    cref: Optional[str] = None
+    especialidade: Optional[str] = None
+    class Config: from_attributes = True
+
+class ProfessorEspecialidadeUpdate(BaseModel):
+    especialidade: str
+
 # --- 3. EVOLUÇÃO E MEDIDAS ---
 class EvolucaoCreate(BaseModel):
     peso: float

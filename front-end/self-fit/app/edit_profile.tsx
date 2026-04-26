@@ -51,7 +51,6 @@ export default function EditProfile() {
   const router = useRouter();
 
 
-
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER' | null>(null);
 
   const [name, setName] = useState('');
@@ -61,6 +60,8 @@ export default function EditProfile() {
   const [avatarPickerVisible, setAvatarPickerVisible] = useState(false);
 
   const [objectives, setObjectives] = useState('');
+
+  const [specialty, setSpecialty] = useState('');
 
   const [saving, setSaving] = useState(false);
 
@@ -104,6 +105,15 @@ export default function EditProfile() {
 
           }
 
+        }
+
+        if (perfil === 'TEACHER') {
+          try {
+            const profRes = await api.get('/professores/me');
+            if (!cancelled && profRes.data?.especialidade != null) {
+              setSpecialty(String(profRes.data.especialidade));
+            }
+          } catch { /* professor sem linha ainda */ }
         }
 
       } catch {
@@ -251,6 +261,10 @@ export default function EditProfile() {
 
         await api.put('/alunos/me/objetivo', { objetivo: objectives.trim() });
 
+      }
+
+      if (userProfile === 'TEACHER') {
+        await api.put('/professores/me/especialidade', { especialidade: specialty.trim() });
       }
 
       router.back();
@@ -413,7 +427,19 @@ export default function EditProfile() {
 
         )}
 
-
+        {userProfile === 'TEACHER' && (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Especialidade</Text>
+            <TextInput
+              value={specialty}
+              onChangeText={setSpecialty}
+              style={styles.textInput}
+              placeholderTextColor={colors.grayMid}
+              placeholder="Ex.: Hipertrofia, Emagrecimento, Funcional..."
+              editable={!saving}
+            />
+          </View>
+        )}
 
         {/* Medidas movidas para /measures */}
 

@@ -253,8 +253,6 @@ def responder_notif(notificacao_id: int, dados: schemas.RespostaNotificacao, ema
 
 # --- 6. PROFESSOR - GESTÃO E VÍNCULOS ---
 
-# No main.py, procure a rota @app.post("/professores") e substitua por esta:
-
 @app.post("/professores")
 def criar_perfil_professor(
     dados: dict, # Agora aceita o corpo da requisição (JSON)
@@ -339,3 +337,27 @@ def feed_professor(email: str = Depends(auth.obter_usuario_atual), db: Session =
     for t in treinos: res.append({"id": f"pe_tr_{t.id}", "tipo": "TREINO", "usuario_nome": t.aluno.usuario.nome, "usuario_foto": t.aluno.usuario.foto_perfil, "titulo": f"Treino Concluído: {t.titulo}", "descricao": f"Levantou {t.volume_total}kg.", "data": t.data_fim})
     res.sort(key=lambda x: x['data'], reverse=True)
     return res[:30]
+
+@app.get("/professores/me", response_model=schemas.ProfessorMeResponse)
+def obter_perfil_professor(
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db)
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_professor:
+        raise HTTPException(status_code=404, detail="Perfil de professor não encontrado.")
+    return u.perfil_professor
+
+@app.put("/professores/me/especialidade", response_model=schemas.ProfessorMeResponse)
+def atualizar_especialidade(
+    dados: schemas.ProfessorEspecialidadeUpdate,
+    email: str = Depends(auth.obter_usuario_atual),
+    db: Session = Depends(get_db)
+):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_professor:
+        raise HTTPException(status_code=404, detail="Perfil de professor não encontrado.")
+    u.perfil_professor.especialidade = dados.especialidade
+    db.commit()
+    db.refresh(u.perfil_professor)
+    return u.perfil_professor
