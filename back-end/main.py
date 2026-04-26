@@ -63,9 +63,35 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
     return {"access_token": auth.criar_token_acesso({"sub": u.email, "perfil": u.tipo_perfil}), "token_type": "bearer"}
 
+
 @app.get("/usuarios/me", response_model=schemas.UsuarioResponse)
 def ler_me(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    return db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    user = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # 1. Contagem de Seguidores/Seguindo
+    seguidores = db.query(models.Seguidor).filter(models.Seguidor.seguido_id == user.id, models.Seguidor.status == "ACEITO").count()
+    seguindo = db.query(models.Seguidor).filter(models.Seguidor.seguidor_id == user.id, models.Seguidor.status == "ACEITO").count()
+    
+    # 2. LÓGICA DE TREINAMENTOS: Conta registos na tabela treinos_realizados
+    treinos = 0
+    if user.perfil_aluno:
+        treinos = db.query(models.TreinoRealizado).filter(
+            models.TreinoRealizado.aluno_id == user.perfil_aluno.id
+        ).count()
+    
+    return {
+        "id": user.id,
+        "nome": user.nome,
+        "email": user.email,
+        "tipo_perfil": user.tipo_perfil,
+        "foto_perfil": user.foto_perfil,
+        "seguidores_count": seguidores,
+        "seguindo_count": seguindo,
+        "treinos_count": treinos # Agora dinâmico!
+    }
+
 
 @app.put("/usuarios/me", response_model=schemas.UsuarioResponse)
 def atualizar_me(dados: schemas.UsuarioPerfilUpdate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
