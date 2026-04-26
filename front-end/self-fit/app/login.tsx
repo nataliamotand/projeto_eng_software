@@ -22,7 +22,7 @@ import { colors } from '../src/components/ui/theme';
 
 const { height, width } = Dimensions.get('window');
 
-export default function Login(): JSX.Element {
+export default function Login(){
   const router = useRouter();
 
   // Estados de controle (Lógica)

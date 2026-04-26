@@ -1,440 +1,224 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  TextInput,
-  Modal,
-  Pressable,
-  Dimensions,
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  View, Text, StyleSheet, SafeAreaView, TouchableOpacity, 
+  ActivityIndicator, Alert, Platform 
 } from 'react-native';
-import ImageRotator from '../src/components/ui/image-rotator';
-import { Ionicons, FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import api from '../src/services/api';
 import { colors } from '../src/components/ui/theme';
 
-const { width } = Dimensions.get('window');
-
-const muscleMap: Record<string, string> = {
-  "upper back": "Costas (parte de cima)",
-  "triceps": "Tríceps",
-  "traps": "Trapézio",
-  "spine": "Lombar",
-  "serratus anterior": "Serrátil",
-  "quads": "Quadríceps",
-  "pectorals": "Peito",
-  "levator scapulae": "Pescoço",
-  "lats": "Costas",
-  "hamstrings": "Posterior de coxa",
-  "glutes": "Glúteos",
-  "forearms": "Antebraço",
-  "delts": "Ombro",
-  "cardiovascular system": "Cardio",
-  "calves": "Panturrilha",
-  "biceps": "Bíceps",
-  "adductors": "Adutor",
-  "abs": "Abdômen",
-  "abductors": "Abdutor"
-};
-
-// Timer isolated to avoid re-rendering the whole list every second
-const Timer: React.FC<{ initialSeconds?: number }> = React.memo(({ initialSeconds = 0 }) => {
-  const [sec, setSec] = useState<number>(initialSeconds);
+export default function WorkoutScreen() {
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [routine, setRoutine] = useState<any>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [startTime] = useState(new Date()); // Marca o início do treino
 
   useEffect(() => {
-    const id = setInterval(() => setSec((s) => s + 1), 1000);
-    return () => clearInterval(id);
-  }, []);
+    loadWorkoutDetails();
+  }, [id]);
 
-  const fmt = useMemo(() => {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    if (sec >= 3600) {
-      const h = Math.floor(sec / 3600);
-      const m = Math.floor((sec % 3600) / 60);
-      const s = sec % 60;
-      return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  async function loadWorkoutDetails() {
+    try {
+      setLoading(true);
+      const response = await api.get(`/fichas/${id}`);
+      setRoutine(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar treino:", error);
+      Alert.alert("Erro", "Não foi possível carregar os detalhes do treino.");
+      router.back();
+    } finally {
+      setLoading(false);
     }
-    const m = Math.floor(sec / 60);
-    const s = sec % 60;
-    return `${pad(m)}:${pad(s)}`;
-  }, [sec]);
+  }
 
-  return <Text style={styles.timerText}>{fmt}</Text>;
-});
+  // --- LÓGICA DE FINALIZAÇÃO ---
+  async function handleFinishWorkout() {
+    try {
+      setSaving(true);
 
-type SetRow = { id: string; weight?: string; reps?: string; distance?: string; time?: string; floors?: string; isCompleted?: boolean };
-type WorkoutExercise = {
-  id: string | number;
-  name: string;
-  image?: string;
-  images?: string[];
-  target?: string;
-  tracking: 'strength' | 'cardio';
-  sets: SetRow[];
-};
+      // 1. Cálculo de Duração (Engenharia básica: tempo_fim - tempo_inicio)
+      const endTime = new Date();
+      const durationMs = endTime.getTime() - startTime.getTime();
+      const durationMinutes = Math.floor(durationMs / 60000) || 1; // Mínimo 1 min
 
-export default function Workout(): JSX.Element {
-  const router = useRouter();
+      // 2. Cálculo de Volume Total (Carga x Reps x Séries)
+      const totalVolume = routine.exercicios.reduce((acc: number, ex: any) => {
+        const weight = parseFloat(ex.carga) || 0;
+        const reps = parseInt(ex.repeticoes) || 0;
+        return acc + (weight * reps * ex.series);
+      }, 0);
 
-  // Mocked incoming route params -> workoutData
-  const [workoutData, setWorkoutData] = useState<WorkoutExercise[]>(() => [
-    {
-      id: 'ex1',
-      name: 'Agachamento',
-      image: '',
-      tracking: 'strength',
-      sets: [
-        { id: 's1', weight: '60', reps: '8', isCompleted: false },
-        { id: 's2', weight: '65', reps: '6', isCompleted: false },
-        { id: 's3', weight: '70', reps: '4', isCompleted: false },
-      ],
-    },
-    {
-      id: 'ex2',
-      name: 'Corrida Leve',
-      image: '',
-      tracking: 'cardio',
-      sets: [
-        { id: 'c1', distance: '1.5', time: '08:00', isCompleted: false },
-        { id: 'c2', distance: '1.0', time: '05:30', isCompleted: false },
-      ],
-    },
-  ]);
+      // 3. Montagem do Payload para o Histórico
+      const payload = {
+        titulo: routine.titulo,
+        duracao_minutos: durationMinutes,
+        volume_total: totalVolume,
+        exercicios: routine.exercicios.map((ex: any) => ({
+          nome: ex.exercicio_referencia_id,
+          series: ex.series,
+          repeticoes: ex.repeticoes,
+          carga: ex.carga
+        }))
+      };
 
-  const [cancelConfirmVisible, setCancelConfirmVisible] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [menuTargetId, setMenuTargetId] = useState<string | number | null>(null);
+      console.log("📡 Salvando treino no histórico...");
+      await api.post('/alunos/finalizar-treino', payload);
 
-  // Toggle completion of a set (isolated update)
-  const toggleSetCompleted = useCallback((exId: string | number, setId: string) => {
-    setWorkoutData((prev) =>
-      prev.map((ex) => {
-        if (String(ex.id) !== String(exId)) return ex;
-        return {
-          ...ex,
-          sets: ex.sets.map((s) => (s.id === setId ? { ...s, isCompleted: !s.isCompleted } : s)),
-        };
-      }),
-    );
-  }, []);
+      Alert.alert("Treino Finalizado!", `Bom trabalho!\nVolume: ${totalVolume}kg\nDuração: ${durationMinutes}min`, [
+        { text: "Ver Histórico", onPress: () => router.replace('/previous_workouts') }
+      ]);
 
-  const updateSetValue = useCallback((exId: string | number, setId: string, field: keyof SetRow, value: string) => {
-    setWorkoutData((prev) =>
-      prev.map((ex) => {
-        if (String(ex.id) !== String(exId)) return ex;
-        return {
-          ...ex,
-          sets: ex.sets.map((s) => (s.id === setId ? { ...s, [field]: value } : s)),
-        };
-      }),
-    );
-  }, []);
-
-  const addSeriesToExercise = useCallback((exId: string | number) => {
-    setWorkoutData((prev) =>
-      prev.map((ex) => {
-        if (String(ex.id) !== String(exId)) return ex;
-        const newSet: SetRow =
-          ex.tracking === 'strength'
-            ? { id: `${Date.now()}`, weight: '', reps: '', isCompleted: false }
-            : { id: `${Date.now()}`, distance: '', time: '', isCompleted: false };
-        return { ...ex, sets: [...ex.sets, newSet] };
-      }),
-    );
-  }, []);
-
-  const addExercise = useCallback(() => {
-    // Open the exercise picker (same flow as CreateRoutine)
-    router.push('/choose_exercise');
-  }, []);
-
-  // When returning from the exercise picker, merge any pending selected exercises
-  useFocusEffect(
-    React.useCallback(() => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        const added = globalThis.__PENDING_SELECTED_EXERCISES;
-        if (Array.isArray(added) && added.length > 0) {
-          const toAdd: WorkoutExercise[] = added.map((p: any) => {
-            const tracking = p.tracking || (p.type === 'cardio' ? 'cardio' : 'strength');
-            const defaultSets =
-              tracking === 'cardio'
-                ? [{ id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`, distance: p.distance || p.plannedDistance || '', time: p.time || p.plannedTime || '', isCompleted: false }]
-                : [{ id: `${Date.now()}-${Math.floor(Math.random() * 10000)}`, weight: p.weight || p.plannedWeight || '', reps: p.reps || p.plannedReps || '', isCompleted: false }];
-
-            return {
-              id: p.id ?? `${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-              name: p.name || p.title || '',
-              images: p.images && p.images.length ? p.images : p.image ? [p.image] : p.gifUrl ? [p.gifUrl] : [],
-              target: p.target || p.muscle || '',
-              tracking,
-              sets: defaultSets,
-            } as WorkoutExercise;
-          });
-
-          setWorkoutData((prev) => {
-            const existingIds = new Set(prev.map((e) => String(e.id)));
-            const merged = [...prev];
-            for (const ex of toAdd) {
-              if (!existingIds.has(String(ex.id))) merged.push(ex);
-            }
-            return merged;
-          });
-
-          // clear global var
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          delete globalThis.__PENDING_SELECTED_EXERCISES;
-        }
-      } catch (e) {
-        // ignore
+      // Fallback para Web
+      if (Platform.OS === 'web') {
+        router.replace('/previous_workouts');
       }
-      return () => {};
-    }, []),
-  );
 
-  function handleCancel() {
-    setCancelConfirmVisible(true);
+    } catch (error: any) {
+      console.error("Erro ao salvar treino:", error.response?.data || error.message);
+      Alert.alert("Erro", "O treino foi concluído, mas não conseguimos salvar no histórico.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function openMenuFor(id: string | number) {
-    setMenuTargetId(id);
-    setMenuVisible(true);
-  }
-
-  function closeMenu() {
-    setMenuVisible(false);
-    setMenuTargetId(null);
-  }
-
-  function handleDeleteExercise(id?: string | number | null) {
-    if (id == null) return closeMenu();
-    setWorkoutData((prev) => prev.filter((ex) => String(ex.id) !== String(id)));
-    closeMenu();
-  }
-
-  function handleDeleteSeries(id?: string | number | null) {
-    if (id == null) return closeMenu();
-    setWorkoutData((prev) =>
-      prev.map((ex) => {
-        if (String(ex.id) === String(id)) {
-          const newSets = ex.sets.length > 1
-            ? ex.sets.slice(0, -1)
-            : [
-                ex.tracking === 'cardio'
-                  ? { id: `${Date.now()}`, distance: '', time: '', isCompleted: false }
-                  : { id: `${Date.now()}`, weight: '', reps: '', isCompleted: false },
-              ];
-          return { ...ex, sets: newSets };
-        }
-        return ex;
-      }),
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.red} />
+        <Text style={{ color: '#fff', marginTop: 10 }}>Preparando seu treino...</Text>
+      </View>
     );
-    closeMenu();
   }
 
-  function confirmCancel() {
-    setCancelConfirmVisible(false);
-    router.back();
-  }
-
-  function handleFinish() {
-    // Placeholder: save workout results
-    router.back();
-  }
+  const currentExercise = routine?.exercicios[currentIndex];
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-          <Text style={styles.cancelButtonText}>Cancelar</Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="close" size={28} color={colors.white} />
         </TouchableOpacity>
-
-        <Timer initialSeconds={0} />
-
-        <TouchableOpacity style={styles.finishButton} onPress={handleFinish}>
-          <Text style={styles.finishButtonText}>Concluir</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{routine?.titulo}</Text>
+        <View style={{ width: 28 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        {workoutData.map((ex) => (
-          <View key={String(ex.id)} style={styles.card}>
-            <View style={styles.cardHeader}>
-              <ImageRotator images={ex.images && ex.images.length ? ex.images : ex.image ? [ex.image] : []} style={styles.exImage} />
-              <View style={styles.cardHeaderCenter}>
-                <Text style={styles.exName}>{ex.name}</Text>
-                {ex.target ? <Text style={styles.exTarget}>{muscleMap[String(ex.target).toLowerCase()] || ex.target}</Text> : null}
-              </View>
-              <TouchableOpacity onPress={() => openMenuFor(ex.id)}>
-                <Ionicons name="ellipsis-vertical" size={20} color={colors.grayLight} />
-              </TouchableOpacity>
+      <View style={styles.content}>
+        {/* Card do Exercício Atual */}
+        <View style={styles.exerciseCard}>
+          <Text style={styles.exerciseName}>
+            {currentExercise?.exercicio_referencia_id.replace(/_/g, ' ')}
+          </Text>
+          
+          <View style={styles.statsRow}>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>SÉRIES</Text>
+              <Text style={styles.statValue}>{currentExercise?.series}</Text>
             </View>
-
-            <View style={styles.setsTable}>
-              <View style={styles.setsHeader}>
-                <Text style={styles.setsHeaderIndex}>SÉRIE</Text>
-                {ex.tracking === 'strength' ? (
-                  <>
-                    <Text style={styles.setsHeaderText}>KG</Text>
-                    <Text style={styles.setsHeaderText}>REPS</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.setsHeaderText}>KM</Text>
-                    <Text style={styles.setsHeaderText}>TEMPO</Text>
-                  </>
-                )}
-                <View style={{ width: 40 }} />
-              </View>
-
-              {ex.sets.map((s, idx) => (
-                <View key={s.id} style={[styles.setRow, s.isCompleted ? styles.setRowDone : null]}>
-                  <Text style={styles.setIndex}>{String(idx + 1)}</Text>
-
-                  {ex.tracking === 'strength' ? (
-                    <>
-                      <TextInput
-                        style={styles.setInput}
-                        value={s.weight ?? ''}
-                        placeholder={s.weight ?? ''}
-                        placeholderTextColor={colors.grayMid}
-                        onChangeText={(val) => updateSetValue(ex.id, s.id, 'weight', val)}
-                        keyboardType="numeric"
-                      />
-
-                      <TextInput
-                        style={styles.setInput}
-                        value={s.reps ?? ''}
-                        placeholder={s.reps ?? ''}
-                        placeholderTextColor={colors.grayMid}
-                        onChangeText={(val) => updateSetValue(ex.id, s.id, 'reps', val)}
-                        keyboardType="numeric"
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <TextInput
-                        style={styles.setInput}
-                        value={s.distance ?? ''}
-                        placeholder={s.distance ?? ''}
-                        placeholderTextColor={colors.grayMid}
-                        onChangeText={(val) => updateSetValue(ex.id, s.id, 'distance', val)}
-                        keyboardType="numeric"
-                      />
-
-                      <TextInput
-                        style={styles.setInput}
-                        value={s.time ?? ''}
-                        placeholder={s.time ?? ''}
-                        placeholderTextColor={colors.grayMid}
-                        onChangeText={(val) => updateSetValue(ex.id, s.id, 'time', val)}
-                        keyboardType="default"
-                      />
-                    </>
-                  )}
-
-                  <TouchableOpacity style={styles.checkTouch} onPress={() => toggleSetCompleted(ex.id, s.id)}>
-                    <FontAwesome name={s.isCompleted ? 'check-circle' : 'circle-thin'} size={22} color={s.isCompleted ? colors.red : colors.grayLight} />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              <TouchableOpacity style={styles.addSeriesButton} onPress={() => addSeriesToExercise(ex.id)}>
-                <FontAwesome name="plus" size={14} color={colors.white} style={{ marginRight: 8 }} />
-                <Text style={styles.addSeriesText}>Adicionar Série</Text>
-              </TouchableOpacity>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>REPS</Text>
+              <Text style={styles.statValue}>{currentExercise?.repeticoes}</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statLabel}>CARGA</Text>
+              <Text style={styles.statValue}>{currentExercise?.carga} kg</Text>
             </View>
           </View>
-        ))}
 
-        <TouchableOpacity style={styles.addExerciseButton} onPress={addExercise}>
-          <FontAwesome name="plus" size={18} color={colors.white} style={{ marginRight: 8 }} />
-          <Text style={styles.addExerciseText}>Adicionar exercício</Text>
+          {currentExercise?.observacao && (
+            <Text style={styles.obsText}>Obs: {currentExercise.observacao}</Text>
+          )}
+        </View>
+
+        <View style={styles.timerPlaceholder}>
+            <MaterialCommunityIcons name="timer-outline" size={40} color={colors.grayMid} />
+            <Text style={styles.timerText}>Aguardando descanso...</Text>
+            <Text style={{color: colors.grayMid, fontSize: 12}}>Exercício {currentIndex + 1} de {routine?.exercicios.length}</Text>
+        </View>
+      </View>
+
+      {/* Navegação entre exercícios */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={[styles.navButton, currentIndex === 0 && { opacity: 0.3 }]}
+          disabled={currentIndex === 0 || saving}
+          onPress={() => setCurrentIndex(prev => prev - 1)}
+        >
+          <Text style={styles.navButtonText}>Anterior</Text>
         </TouchableOpacity>
-      </ScrollView>
 
-      <Modal visible={cancelConfirmVisible} transparent animationType="fade" onRequestClose={() => setCancelConfirmVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setCancelConfirmVisible(false)}>
-          <View style={styles.modalContentCentered}>
-            <Text style={[styles.modalTitle, { marginBottom: 12 }]}>Cancelar treino?</Text>
-            <TouchableOpacity style={styles.modalOptionButton} onPress={confirmCancel}>
-              <Text style={styles.modalOptionText}>Sim, cancelar</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalOptionButton, { marginTop: 8 }]} onPress={() => setCancelConfirmVisible(false)}>
-              <Text style={styles.modalOptionText}>Manter treino</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
-      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
-          <View style={styles.modalContentCentered}>
-            <TouchableOpacity style={[styles.modalOptionButton, { marginBottom: 8 }]} onPress={() => handleDeleteSeries(menuTargetId)}>
-              <Text style={[styles.modalOptionText, { color: colors.grayLight }]}>Deletar uma série</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleDeleteExercise(menuTargetId)}>
-              <Text style={[styles.modalOptionText, { color: colors.red }]}>Remover exercício</Text>
-            </TouchableOpacity>
-          </View>
-        </Pressable>
-      </Modal>
+        <TouchableOpacity 
+          style={[styles.mainButton, saving && { opacity: 0.7 }]}
+          disabled={saving}
+          onPress={() => {
+            if (currentIndex < routine.exercicios.length - 1) {
+              setCurrentIndex(prev => prev + 1);
+            } else {
+              handleFinishWorkout(); // <--- CHAMA A FUNÇÃO REAL DE SALVAMENTO
+            }
+          }}
+        >
+          {saving ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.mainButtonText}>
+              {currentIndex === routine.exercicios.length - 1 ? "Finalizar" : "Próximo"}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 24,
-    paddingBottom: 12,
-    flexDirection: 'row',
+  safeArea: { flex: 1, backgroundColor: '#000' },
+  loadingContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    padding: 20, 
     alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: '#111'
   },
-  cancelButton: { backgroundColor: '#2A2A2A', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
-  cancelButtonText: { color: colors.white, fontWeight: '600' },
-  timerText: { color: colors.white, fontWeight: '700', fontFamily: 'monospace', fontSize: 18 },
-  finishButton: { backgroundColor: colors.red, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  finishButtonText: { color: colors.white, fontWeight: '700' },
-
-  contentContainer: { padding: 16, paddingBottom: 220 },
-  card: { backgroundColor: colors.cardBg, borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#111' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center' },
-  exImage: { width: 56, height: 56, borderRadius: 28, marginRight: 12, backgroundColor: '#222' },
-  cardHeaderCenter: { flex: 1 },
-  exName: { color: colors.white, fontWeight: '700' },
-  exTarget: { color: colors.grayLight, fontSize: 12, marginTop: 4 },
-
-  setsTable: { marginTop: 12 },
-  setsHeader: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#111' },
-  setsHeaderIndex: { color: colors.grayLight, width: 36, textAlign: 'center', fontSize: 12, fontWeight: '700' },
-  setsHeaderText: { color: colors.grayLight, flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '700' },
-
-  setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, justifyContent: 'flex-start', backgroundColor: 'transparent', borderRadius: 6, marginTop: 6 },
-  setRowDone: { backgroundColor: colors.rowDone },
-  setIndex: { color: colors.white, width: 36, textAlign: 'center' },
-  setInput: { color: colors.white, flex: 1, marginHorizontal: 6, textAlign: 'center', borderRadius: 6, backgroundColor: '#0A0A0A', paddingVertical: 6, paddingHorizontal: 8 },
-  checkTouch: { width: 40, alignItems: 'center' },
-
-  addSeriesButton: { marginTop: 10, backgroundColor: '#2A2A2A', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 10, borderRadius: 8 },
-  addSeriesText: { color: colors.white, fontWeight: '700' },
-
-  addExerciseButton: { marginTop: 18, backgroundColor: colors.red, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 10, width: width - 32 },
-  addExerciseText: { color: colors.white, fontWeight: '700' },
-
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  modalContentCentered: { backgroundColor: '#0A0A0A', padding: 20, borderTopLeftRadius: 12, borderTopRightRadius: 12, borderColor: '#111', borderWidth: 1, alignItems: 'stretch', width: '100%' },
-  modalOptionButton: { backgroundColor: '#111', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 8, width: '100%', alignItems: 'center' },
-  modalOptionText: { color: colors.white, fontSize: 15, fontWeight: '700' },
-  modalTitle: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  headerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  content: { flex: 1, padding: 20 },
+  exerciseCard: { 
+    backgroundColor: '#111', 
+    borderRadius: 20, 
+    padding: 25, 
+    borderWidth: 1, 
+    borderColor: '#222' 
+  },
+  exerciseName: { color: colors.red, fontSize: 24, fontWeight: '900', marginBottom: 20, textAlign: 'center' },
+  statsRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
+  statBox: { alignItems: 'center' },
+  statLabel: { color: colors.grayMid, fontSize: 10, fontWeight: 'bold', marginBottom: 5 },
+  statValue: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  obsText: { color: colors.grayMid, fontStyle: 'italic', textAlign: 'center', marginTop: 10 },
+  timerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  timerText: { color: colors.grayMid, fontSize: 18, marginTop: 10, marginBottom: 5 },
+  footer: { 
+    flexDirection: 'row', 
+    padding: 20, 
+    borderTopWidth: 1, 
+    borderTopColor: '#111',
+    justifyContent: 'space-between'
+  },
+  navButton: { padding: 15 },
+  navButtonText: { color: colors.grayMid, fontWeight: 'bold' },
+  mainButton: { 
+    backgroundColor: colors.red, 
+    minWidth: 140,
+    height: 50,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  mainButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 }
 });

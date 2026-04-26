@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   SafeAreaView,
   View,
   Text,
   StyleSheet,
-  TextInput,
   Image,
   TouchableOpacity,
   FlatList,
@@ -12,26 +11,33 @@ import {
   Modal,
   Pressable,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api'; 
+import { TextInput } from 'react-native-gesture-handler';
 
 const { width } = Dimensions.get('window');
 
-// 1. COMPONENTE DE HEADER DINÂMICO
+// --- COMPONENTE DE HEADER ---
 function Header({ user }: { user: any }) {
   const router = useRouter();
+  const avatarUri = typeof user?.foto_perfil === 'string' && user.foto_perfil.trim() ? user.foto_perfil : null;
 
   return (
     <View style={styles.header}>
       <View style={styles.headerDetail} pointerEvents="none" />
       <View style={styles.headerLeft}>
         <View style={styles.avatar}>
-          <Image source={require('../assets/images/logo.png')} style={styles.avatarImage} resizeMode="contain" />
+          <Image
+            source={avatarUri ? { uri: avatarUri } : require('../assets/images/logo.png')}
+            style={styles.avatarImage}
+          />
         </View>
         <View style={styles.userInfo}>
           <Text style={styles.userName}>{user?.nome || 'Carregando...'}</Text>
@@ -62,55 +68,87 @@ export default function RoutinesAndWorkouts() {
   const [requestMessage, setRequestMessage] = useState('');
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
-  async function loadData() {
+  const loadData = async () => {
     try {
       setLoading(true);
-      try {
-        const userRes = await api.get('/usuarios/me');
-        setUser(userRes.data);
-      } catch (err) { console.error("Erro ao carregar usuário:", err); }
-
-      try {
-        const routinesRes = await api.get('/alunos/minhas-rotinas');
-        setRoutines(routinesRes.data);
-      } catch (err) { console.error("Erro ao carregar rotinas:", err); }
+      const [userRes, routinesRes] = await Promise.all([
+        api.get('/usuarios/me'),
+        api.get('/alunos/minhas-rotinas')
+      ]);
+      setUser(userRes.data);
+      setRoutines(routinesRes.data);
+    } catch (err) {
+      console.error("Erro ao sincronizar dados:", err);
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const selectedRoutine = routines.find(r => r.id === openMenuId);
   const isProfessorRoutine = selectedRoutine?.criado_por_professor === true;
 
-  function handleEdit(id: number) {
+  // --- LÓGICA DE EXCLUSÃO ---
+  const handleDelete = async (id: number) => {
+    console.log("🟢 BOTÃO CLICADO! Tentando deletar a ficha ID:", id);
+    
+    if (isProfessorRoutine) return;
+  
+    const performDelete = async () => {
+      try {
+        setLoading(true);
+        console.log(`📡 Enviando DELETE para /fichas/${id}...`);
+        await api.delete(`/fichas/${id}`);
+        
+        setRoutines(prev => prev.filter(r => r.id !== id));
+        setOpenMenuId(null);
+        console.log("✅ Deletado com sucesso!");
+      } catch (err) {
+        console.error("❌ Erro ao deletar:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+  
+    // Se for WEB, usa o confirm do navegador. Se for MOBILE, usa o Alert.alert
+    if (Platform.OS === 'web') {
+      if (window.confirm("Tem certeza que deseja apagar este treino?")) {
+        await performDelete();
+      }
+    } else {
+      Alert.alert(
+        "Excluir Rotina",
+        "Tem certeza que deseja apagar este treino?",
+        [
+          { text: "Cancelar", style: "cancel" },
+          { text: "Excluir", style: "destructive", onPress: performDelete }
+        ]
+      );
+    }
+  };
+
+  const handleEdit = (id: number) => {
     if (isProfessorRoutine) {
-      Alert.alert("Bloqueado", "Esta rotina foi criada pelo professor e não pode ser editada.");
+      Alert.alert("Acesso Restrito", "Treinos montados pelo professor não podem ser alterados.");
       return;
     }
     setOpenMenuId(null);
     router.push(`/create_routine?id=${id}`);
-  }
+  };
 
-  function handleDelete(id: number) {
-    if (isProfessorRoutine) return;
-    setOpenMenuId(null);
-    // Aqui viria a lógica de delete no banco
-  }
-
-  function handleSendRequest() {
+  const handleSendRequest = async () => {
     if (!requestMessage.trim()) {
-      Alert.alert("Erro", "O texto da solicitação não pode ser nulo.");
-      return;
+      return Alert.alert("Campo Vazio", "Descreva o que você deseja treinar.");
     }
-    console.log('Notificação enviada para professor:', requestMessage);
     setRequestMessage('');
     setShowRequestModal(false);
-    Alert.alert("Enviado", "Sua solicitação foi encaminhada ao professor.");
-  }
+    Alert.alert("Sucesso", "Seu professor foi notificado!");
+  };
 
   if (loading) return <View style={styles.loadingArea}><ActivityIndicator color={colors.red} size="large" /></View>;
 
@@ -148,7 +186,6 @@ export default function RoutinesAndWorkouts() {
             keyExtractor={(item) => String(item.id)}
             renderItem={({ item }) => (
               <View style={styles.card}>
-                {/* CORREÇÃO 1: Menu só aparece se NÃO for do professor */}
                 {!item.criado_por_professor && (
                   <TouchableOpacity 
                     style={styles.cardOptions} 
@@ -158,29 +195,62 @@ export default function RoutinesAndWorkouts() {
                   </TouchableOpacity>
                 )}
 
-                <Text style={styles.cardTitle}>{item.title}</Text>
+                <Text style={styles.cardTitle}>{item.titulo}</Text>
+                
                 <View style={styles.cardRow}>
-                  <FontAwesome name={item.status === 'approved' ? 'check-circle' : 'clock-o'} size={14} color={colors.grayText} />
+                  <FontAwesome 
+                    name={item.criado_por_professor ? 'mortar-board' : 'user'} 
+                    size={14} 
+                    color={colors.grayText} 
+                  />
                   <Text style={styles.approvedText}>
                     {item.criado_por_professor ? ` Criada pelo Professor` : ` Sua rotina`}
                   </Text>
                 </View>
-                <TouchableOpacity style={styles.startButton} onPress={() => router.push(`/workout?id=${item.id}`)}>
+                
+                <TouchableOpacity 
+                  style={styles.startButton} 
+                  onPress={() => router.push({
+                    pathname: "/workout" as any,
+                    params: { id: item.id }
+                  })}
+                >
                   <Text style={styles.startButtonText}>Iniciar Rotina</Text>
                 </TouchableOpacity>
               </View>
             )}
+            ListEmptyComponent={
+                <View style={{ alignItems: 'center', marginTop: 50 }}>
+                    <Ionicons name="barbell-outline" size={60} color="#222" />
+                    <Text style={{ color: '#444', marginTop: 10 }}>Nenhum treino cadastrado.</Text>
+                </View>
+            }
             contentContainerStyle={styles.list}
           />
 
+          {/* MODAL DE OPÇÕES ATUALIZADO */}
           <Modal visible={openMenuId !== null} transparent animationType="fade">
             <Pressable style={styles.modalBackdrop} onPress={() => setOpenMenuId(null)}>
               <View style={styles.modalContentCentered}>
                 <Text style={styles.modalAlertText}>Opções da Rotina</Text>
-                <TouchableOpacity style={styles.modalOptionButton} onPress={() => handleEdit(openMenuId!)}>
-                  <Text style={styles.modalOptionText}>Editar rotina</Text>
+                
+                <TouchableOpacity 
+                  style={styles.modalOptionButton} 
+                  onPress={() => {
+                  setOpenMenuId(null);
+                  router.push({
+                  pathname: '/edit_routine',
+                  params: { id: openMenuId } // Passa o ID da rotina para a tela de edição
+                });
+              }}
+>
+                <Text style={styles.modalOptionText}>Editar rotina</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalOptionButton, { marginTop: 8 }]} onPress={() => handleDelete(openMenuId!)}>
+
+                <TouchableOpacity 
+                  style={[styles.modalOptionButton, { marginTop: 10 }]} 
+                  onPress={() => handleDelete(openMenuId!)} // <--- CHAMADA ADICIONADA
+                >
                   <Text style={[styles.modalOptionText, { color: colors.red }]}>Excluir rotina</Text>
                 </TouchableOpacity>
               </View>
@@ -188,24 +258,22 @@ export default function RoutinesAndWorkouts() {
           </Modal>
 
           <Modal visible={showRequestModal} transparent animationType="slide">
-            <View style={styles.modalBackdrop}>
+            <Pressable style={styles.modalBackdrop} onPress={() => setShowRequestModal(false)}>
               <View style={styles.modalContentCentered}>
                 <Text style={styles.modalTitle}>Solicitar ao professor</Text>
                 <TextInput
                   style={styles.requestInput}
-                  placeholder="Ex: Gostaria de focar em ombros essa semana..."
-                  placeholderTextColor="#666"
+                  placeholder="Descreva o que você precisa..."
+                  placeholderTextColor="#444"
                   multiline
                   value={requestMessage}
                   onChangeText={setRequestMessage}
                 />
-                <View style={styles.requestButtonsRow}>
-                  <TouchableOpacity style={[styles.requestButton, { backgroundColor: colors.red }]} onPress={handleSendRequest}>
-                    <Text style={{ color: '#fff', fontWeight: 'bold' }}>Enviar Pedido</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={styles.sendButton} onPress={handleSendRequest}>
+                  <Text style={styles.sendButtonText}>Enviar Pedido</Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            </Pressable>
           </Modal>
 
         </View>
@@ -216,13 +284,14 @@ export default function RoutinesAndWorkouts() {
   );
 }
 
+// Estilos mantidos iguais...
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   header: {
     backgroundColor: colors.red,
     paddingHorizontal: 16,
     paddingTop: 45,
-    paddingBottom: 18,
+    paddingBottom: 25,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -246,25 +315,24 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 25,
     backgroundColor: '#000',
-    alignItems: 'center',
-    justifyContent: 'center',
+    overflow: 'hidden',
     marginRight: 12,
   },
-  avatarImage: { width: 40, height: 24 },
+  avatarImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   userInfo: { flexDirection: 'column' },
   userName: { color: colors.white, fontSize: 16, fontWeight: '700' },
-  userHandle: { color: colors.white, fontSize: 12, marginTop: 2 },
+  userHandle: { color: colors.white, fontSize: 12, marginTop: 2, opacity: 0.8 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   iconTouch: { marginLeft: 14, padding: 6 },
   container: { flex: 1, backgroundColor: colors.background },
   inner: {
     flex: 1,
     backgroundColor: colors.background,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    marginTop: -12,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -15,
     paddingHorizontal: 16,
-    paddingTop: 18,
+    paddingTop: 20,
   },
   loadingArea: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
   newRoutineButton: {
@@ -272,96 +340,72 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.darkRed,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 8,
+    paddingVertical: 15,
+    borderRadius: 14,
+    marginBottom: 10,
+    elevation: 4
   },
   newRoutineText: { color: colors.white, marginLeft: 8, fontWeight: '700' },
   newMenu: {
-    backgroundColor: '#121212',
-    borderRadius: 10,
-    paddingVertical: 6,
-    marginBottom: 12,
-    paddingHorizontal: 8,
+    backgroundColor: '#111',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#222'
   },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 6 },
-  menuText: { color: colors.white, marginLeft: 10, fontSize: 14 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 15 },
-  sectionTitle: { color: colors.white, fontSize: 24, fontWeight: '700' },
-  list: { paddingBottom: 100 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 10 },
+  menuText: { color: colors.white, marginLeft: 12, fontSize: 14 },
+  sectionHeader: { marginBottom: 15 },
+  sectionTitle: { color: colors.white, fontSize: 22, fontWeight: '800' },
+  list: { paddingBottom: 120 },
   card: {
     backgroundColor: colors.cardBg,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 15,
     position: 'relative',
     borderWidth: 1,
     borderColor: '#1A1A1A',
   },
-  // CORREÇÃO 2: Hitbox aumentada e Pointer Cursor
   cardOptions: { 
     position: 'absolute', 
-    right: 0, 
-    top: 0, 
-    padding: 20, // Hitbox maior para facilitar o toque
-    zIndex: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    // @ts-ignore
-    cursor: 'pointer' 
+    right: 5, 
+    top: 5, 
+    padding: 15,
+    zIndex: 10
   },
-  cardTitle: { color: colors.red, fontSize: 18, fontWeight: '700', marginBottom: 8 },
-  cardRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  approvedText: { color: colors.grayText, marginLeft: 8, fontSize: 13 },
+  cardTitle: { color: colors.red, fontSize: 19, fontWeight: '800', marginBottom: 8 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
+  approvedText: { color: colors.grayText, marginLeft: 8, fontSize: 13, fontWeight: '500' },
   startButton: {
-    marginTop: 15,
-    backgroundColor: '#222',
-    height: 45,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  startButtonText: { color: colors.white, fontWeight: '700' },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20
-  },
-  modalContentCentered: {
-    backgroundColor: '#0F0F0F',
-    padding: 24,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#222',
-    width: '100%',
-  },
-  modalTitle: { color: colors.white, fontSize: 18, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
-  modalAlertText: { color: colors.grayText, fontSize: 12, textAlign: 'center', marginBottom: 15, textTransform: 'uppercase' },
-  modalOptionButton: {
+    marginTop: 18,
     backgroundColor: '#161616',
-    paddingVertical: 14,
-    borderRadius: 10,
+    height: 48,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#222'
   },
+  startButtonText: { color: colors.white, fontWeight: '700', fontSize: 15 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  modalContentCentered: { backgroundColor: '#0A0A0A', width: '85%', padding: 25, borderRadius: 20, borderWidth: 1, borderColor: '#222' },
+  modalTitle: { color: colors.white, fontSize: 18, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
+  modalAlertText: { color: colors.grayText, fontSize: 11, textAlign: 'center', marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
+  modalOptionButton: { backgroundColor: '#161616', paddingVertical: 15, borderRadius: 12, alignItems: 'center' },
   modalOptionText: { color: colors.white, fontSize: 16, fontWeight: '600' },
   requestInput: {
-    backgroundColor: '#050505',
-    borderColor: '#333',
+    backgroundColor: '#000',
+    borderColor: '#222',
     borderWidth: 1,
     color: colors.white,
-    padding: 12,
-    borderRadius: 10,
+    padding: 15,
+    borderRadius: 12,
     textAlignVertical: 'top',
     minHeight: 120,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  requestButtonsRow: { flexDirection: 'row', justifyContent: 'center' },
-  requestButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
+  sendButton: { backgroundColor: colors.red, padding: 15, borderRadius: 12, alignItems: 'center' },
+  sendButtonText: { color: colors.white, fontWeight: 'bold' }
 });

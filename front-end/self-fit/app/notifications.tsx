@@ -24,6 +24,7 @@ interface Notificacao {
   data_criacao: string;
   remetente_id?: number;
   referencia_id?: number;
+  remetente_foto?: string | null;
 }
 
 export default function NotificationsScreen() {
@@ -71,14 +72,19 @@ export default function NotificationsScreen() {
 
   const renderItem = ({ item }: { item: Notificacao }) => {
     const isInvite = item.tipo === 'SOLICITACAO_SEGUIR';
+    const avatarUri =
+      typeof item.remetente_foto === 'string' && item.remetente_foto.trim().length > 0
+        ? item.remetente_foto.trim()
+        : null;
 
     return (
       <View style={styles.notifCard}>
         <View style={styles.row}>
           <View style={styles.avatarContainer}>
-            <Image 
-              source={require('../assets/images/logo.png')} // Aqui você pode usar o avatar do remetente depois
-              style={styles.avatar} 
+            <Image
+              source={avatarUri ? { uri: avatarUri } : require('../assets/images/logo.png')}
+              style={styles.avatar}
+              resizeMode="cover"
             />
             {item.status === 'PENDENTE' && <View style={styles.dot} />}
           </View>
