@@ -1,9 +1,9 @@
 import { Redirect } from 'expo-router';
 
 /**
- * Ponto de entrada do App.
- * O Redirect aciona o RootLayout, que por sua vez decide se
- * o usuário vai para /welcome ou /home baseado no token.
+ * Este é o ponto de entrada (rota "/") da sua aplicação.
+ * Como o fluxo do Self-Fit deve começar sempre pelo Welcome, 
+ * usamos o Redirect para encaminhar o usuário automaticamente.
  */
 export default function Index() {
   return <Redirect href="/welcome" />;

@@ -46,6 +46,7 @@ export default function Profile() {
   const [handle, setHandle] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
+  // ESTADOS DINÂMICOS VINDOS DO BACK-END
   const [trainingsCount, setTrainingsCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
@@ -56,27 +57,38 @@ export default function Profile() {
     (async () => {
       try {
         setLoading(true);
+        setError(null);
+        
         const [res, historyRes] = await Promise.all([
           api.get('/usuarios/me'),
-          // Tentamos carregar o histórico, se falhar (ex: professor), ignoramos
-          api.get('/alunos/historico-treinos').catch(() => ({ data: [] }))
+          api.get('/alunos/historico-treinos')
         ]);
 
         if (cancelled) return;
         
-        const { nome: n, tipo_perfil, email, foto_perfil, seguidores_count, seguindo_count, treinos_count } = res.data;
+        const { 
+          nome: n, 
+          tipo_perfil, 
+          email, 
+          foto_perfil, 
+          seguidores_count, 
+          seguindo_count,
+          treinos_count // Novo campo linkado
+        } = res.data;
         
         setNome(n);
         setUserProfile(tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
         setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
         setAvatarUri(foto_perfil ? String(foto_perfil) : null);
+
+        // ATRIBUIÇÃO DINÂMICA COMPLETA
         setTrainingsCount(treinos_count || 0);
         setFollowersCount(seguidores_count || 0);
         setFollowingCount(seguindo_count || 0);
         setWorkoutHistory(historyRes.data);
 
       } catch (e) {
-        if (!cancelled) setError('Erro ao carregar perfil.');
+        if (!cancelled) setError('Não foi possível sincronizar os dados do perfil.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -84,6 +96,7 @@ export default function Profile() {
     return () => { cancelled = true; };
   }, []);
 
+  // Lógica de Logout
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('token');
@@ -95,24 +108,27 @@ export default function Profile() {
 
   const isTeacher = userProfile === 'TEACHER';
 
+  // Memoização do calendário para performance (mapeia treinos reais)
   const workoutMap = useMemo(() => {
     const m: Record<string, { date: string; title: string }> = {};
     workoutHistory.forEach((w) => {
-      if (w.data_fim) {
-        const dateKey = new Date(w.data_fim).toISOString().split('T')[0];
-        m[dateKey] = { date: dateKey, title: w.titulo };
-      }
+      const dateKey = new Date(w.data_fim).toISOString().split('T')[0];
+      m[dateKey] = { date: dateKey, title: w.titulo };
     });
     return m;
   }, [workoutHistory]);
 
+  // Renderização customizada dos dias no calendário
   function renderDay({ date }: any) {
     const dateString: string = date.dateString;
     const workout = workoutMap[dateString];
+
     return (
       <View style={styles.dayWrapper}>
         {workout ? (
-          <View style={styles.dayCircle}><Text style={styles.dayNumber}>{String(date.day)}</Text></View>
+          <View style={styles.dayCircle}>
+            <Text style={styles.dayNumber}>{String(date.day)}</Text>
+          </View>
         ) : (
           <Text style={[styles.dayNumber, { color: colors.white }]}>{String(date.day)}</Text>
         )}
@@ -125,7 +141,9 @@ export default function Profile() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Header title="Perfil" />
-        <View style={styles.centered}><ActivityIndicator size="large" color={colors.red} /></View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.red} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -135,59 +153,55 @@ export default function Profile() {
       <Header title="Perfil" />
 
       <View style={styles.settingsWrap}>
-        <TouchableOpacity onPress={() => router.push('/edit_profile')} style={styles.iconTouch}>
+        <TouchableOpacity onPress={() => { router.push('/edit_profile'); }} style={styles.iconTouch}>
           <Ionicons name="settings-outline" size={22} color={colors.white} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* CARD DE PERFIL */}
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 200, flexGrow: 1 }}>
         <View style={[styles.profileCard, isTeacher && styles.profileCardTeacher]}>
           <Image source={avatarUri ? { uri: avatarUri } : defaultAvatar} style={styles.avatarLarge} />
           <View style={styles.statsWrap}>
             <Text style={styles.profileName}>{nome || '—'}</Text>
             <Text style={styles.profileHandle}>{handle}</Text>
-            
-            <View style={styles.statsRow}>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{isTeacher ? '—' : trainingsCount}</Text>
-                <Text style={styles.statLabel}>{isTeacher ? 'Certificado' : 'Treinamentos'}</Text>
+            {!isTeacher && (
+              <View style={styles.statsRow}>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{trainingsCount}</Text>
+                  <Text style={styles.statLabel}>Treinamentos</Text>
+                </View>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{followersCount}</Text>
+                  <Text style={styles.statLabel}>Seguidores</Text>
+                </View>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{followingCount}</Text>
+                  <Text style={styles.statLabel}>Seguindo</Text>
+                </View>
               </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{followersCount}</Text>
-                <Text style={styles.statLabel}>Seguidores</Text>
-              </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{followingCount}</Text>
-                <Text style={styles.statLabel}>Seguindo</Text>
-              </View>
-            </View>
+            )}
           </View>
         </View>
 
-        {/* CALENDÁRIO (SÓ PARA ALUNOS) */}
         {!isTeacher && (
-          <View style={styles.calendarWrap}>
-            <Calendar
-              theme={{
-                backgroundColor: 'transparent',
-                calendarBackground: 'transparent',
-                textSectionTitleColor: colors.white,
-                dayTextColor: colors.white,
-                arrowColor: colors.red,
-                monthTextColor: colors.white,
-                todayTextColor: colors.white,
-              }}
-              dayComponent={renderDay}
-            />
-          </View>
-        )}
+          <>
+            <View style={styles.calendarWrap}>
+              <Calendar
+                theme={{
+                  backgroundColor: 'transparent',
+                  calendarBackground: 'transparent',
+                  textSectionTitleColor: colors.white,
+                  dayTextColor: colors.white,
+                  arrowColor: colors.red,
+                  monthTextColor: colors.white,
+                  todayTextColor: colors.white,
+                }}
+                dayComponent={renderDay}
+              />
+            </View>
 
-        {/* LISTA DE AÇÕES (PARA AMBOS) */}
-        <View style={styles.actions}>
-          {!isTeacher && (
-            <>
-              <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/calendar')}>
+            <View style={styles.actions}>
+              <TouchableOpacity style={styles.actionButton} onPress={() => { router.push('/calendar'); }}>
                 <View style={styles.actionLeft}>
                   <FontAwesome name="calendar" size={18} color={colors.white} style={{ marginRight: 12 }} />
                   <Text style={styles.actionText}>Calendário</Text>
@@ -195,7 +209,7 @@ export default function Profile() {
                 <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => router.push('/previous_workouts')}>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/previous_workouts'); }}>
                 <View style={styles.actionLeft}>
                   <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
                   <Text style={styles.actionText}>Treinos</Text>
@@ -203,7 +217,7 @@ export default function Profile() {
                 <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => router.push('/measures')}>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/measures'); }}>
                 <View style={styles.actionLeft}>
                   <MaterialIcons name="monitor-weight" size={18} color={colors.white} style={{ marginRight: 12 }} />
                   <Text style={styles.actionText}>Medições</Text>
@@ -211,33 +225,30 @@ export default function Profile() {
                 <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => router.push('/metrics')}>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => { router.push('/metrics'); }}>
                 <View style={styles.actionLeft}>
                   <MaterialIcons name="insights" size={18} color={colors.white} style={{ marginRight: 12 }} />
                   <Text style={styles.actionText}>Métricas</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
               </TouchableOpacity>
-            </>
-          )}
 
-          {/* BOTÃO DE SAIR - AGORA FORA DO IF DE ALUNO */}
-          <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={handleLogout}>
-            <View style={styles.actionLeft}>
-              <Ionicons name="log-out-outline" size={18} color={colors.red} style={{ marginRight: 12 }} />
-              <Text style={[styles.actionText, { color: colors.red }]}>Sair da Conta</Text>
+              <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={handleLogout}>
+                <View style={styles.actionLeft}>
+                  <Ionicons name="log-out-outline" size={18} color={colors.red} style={{ marginRight: 12 }} />
+                  <Text style={[styles.actionText, { color: colors.red }]}>Sair da Conta</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
-          </TouchableOpacity>
-        </View>
+          </>
+        )}
       </ScrollView>
 
       <StickyFooter active="profile" userProfile={userProfile} />
     </SafeAreaView>
   );
 }
-
-// ... (Estilos permanecem os mesmos)
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
