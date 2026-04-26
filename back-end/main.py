@@ -198,3 +198,31 @@ def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual)
     db.commit()
 
     return {"status": "ok"}
+
+# --- 5.4 PROFESSOR - DESVINCULAR ALUNO ---
+@app.put("/professor/desvincular-aluno/{aluno_id}")
+def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+
+    if not u.perfil_professor:
+        raise HTTPException(status_code=400, detail="Usuário não é professor")
+
+    prof = u.perfil_professor
+
+    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
+
+    # LOG TEMPORÁRIO
+    #print(f"prof.id={prof.id} | aluno.professor_id={aluno.professor_id if aluno else 'NÃO ENCONTRADO'}")
+
+    aluno = db.query(models.Aluno).filter(
+        models.Aluno.id == aluno_id,
+        models.Aluno.professor_id == prof.id
+    ).first()
+
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado ou não vinculado a você")
+
+    aluno.professor_id = None
+    db.commit()
+
+    return {"status": "ok"}
