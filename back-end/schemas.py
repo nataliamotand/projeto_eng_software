@@ -16,6 +16,10 @@ class UsuarioResponse(BaseModel):
     email: str
     tipo_perfil: str
     foto_perfil: Optional[str] = None
+    # Mantemos como int para garantir a tipagem correta no Front-end
+    seguidores_count: int = 0
+    seguindo_count: int = 0
+    
     class Config: from_attributes = True
 
 class UsuarioPerfilUpdate(BaseModel):
@@ -67,14 +71,11 @@ class AlunoResponse(BaseModel):
 class ItemExercicioCreate(BaseModel):
     exercicio_referencia_id: str
     series: int
-    # Mudamos para str para aceitar "12-15" ou "Até a falha"
     repeticoes: str 
-    # Mudamos para str para aceitar "50kg" ou "10 placas"
     carga: str      
     observacao: Optional[str] = None
 
 class FichaTreinoCreate(BaseModel):
-    # aluno_id removido daqui: pegamos pelo Token no Back-end por segurança
     titulo: str
     exercicios: List[ItemExercicioCreate]
 
@@ -111,7 +112,7 @@ class RotinaResponse(RotinaBase):
     data_criacao: Optional[datetime] = None
     class Config: from_attributes = True
 
-# --- 6. SOCIAL E NOTIFICAÇÕES (Lógica Natália) ---
+# --- 6. SOCIAL E NOTIFICAÇÕES ---
 class NotificacaoResponse(BaseModel):
     id: int
     titulo: str
@@ -147,7 +148,7 @@ class TreinoFinalizadoCreate(BaseModel):
     titulo: str
     duracao_minutos: int
     volume_total: float
-    exercicios: List[ExercicioRealizadoBase] # A lista de exercícios feitos
+    exercicios: List[ExercicioRealizadoBase] 
 
 class TreinoFinalizadoResponse(BaseModel):
     id: int

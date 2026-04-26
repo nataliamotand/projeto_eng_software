@@ -63,9 +63,36 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
     return {"access_token": auth.criar_token_acesso({"sub": u.email, "perfil": u.tipo_perfil}), "token_type": "bearer"}
 
+
 @app.get("/usuarios/me", response_model=schemas.UsuarioResponse)
 def ler_me(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    return db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    user = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # 1. Contagem de quem segue o usuário logado (Seguidores)
+    seguidores = db.query(models.Seguidor).filter(
+        models.Seguidor.seguido_id == user.id, 
+        models.Seguidor.status == "ACEITO"
+    ).count()
+    
+    # 2. Contagem de quem o usuário logado está seguindo (Seguindo)
+    seguindo = db.query(models.Seguidor).filter(
+        models.Seguidor.seguidor_id == user.id, 
+        models.Seguidor.status == "ACEITO"
+    ).count()
+    
+    # 3. Retornamos um dicionário explícito para garantir a linkagem
+    return {
+        "id": user.id,
+        "nome": user.nome,
+        "email": user.email,
+        "tipo_perfil": user.tipo_perfil,
+        "foto_perfil": user.foto_perfil,
+        "seguidores_count": seguidores,
+        "seguindo_count": seguindo
+    }
+
 
 @app.put("/usuarios/me", response_model=schemas.UsuarioResponse)
 def atualizar_me(dados: schemas.UsuarioPerfilUpdate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
