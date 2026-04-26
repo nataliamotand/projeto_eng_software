@@ -167,20 +167,47 @@ def registrar_evolucao(dados: schemas.EvolucaoCreate, email: str = Depends(auth.
     aluno = u.perfil_aluno
     hoje = datetime.utcnow().date()
     
-    # Verifica se já registrou peso hoje para atualizar em vez de criar duplicado
+    # Busca se já existe um registo para hoje
     existente = db.query(models.Evolucao).filter(
         models.Evolucao.aluno_id == aluno.id, 
         cast(models.Evolucao.data_registro, Date) == hoje
     ).first()
     
     if existente:
-        existente.peso = dados.peso
-        existente.porcentagem_gordura = dados.porcentagem_gordura
-        existente.massa_muscular = dados.massa_muscular
-        db.commit(); db.refresh(existente); return existente
+        # ATUALIZAÇÃO INTELIGENTE: Só altera se o valor enviado for válido (>0)
+        # Se o aluno preencher apenas o peso, os campos de gordura e músculo no banco são PRESERVADOS.
+        if dados.peso and dados.peso > 0: 
+            existente.peso = dados.peso
+        if dados.porcentagem_gordura and dados.porcentagem_gordura > 0: 
+            existente.porcentagem_gordura = dados.porcentagem_gordura
+        if dados.massa_muscular and dados.massa_muscular > 0: 
+            existente.massa_muscular = dados.massa_muscular
+            
+        db.commit()
+        db.refresh(existente)
+        return existente
         
-    nova = models.Evolucao(aluno_id=aluno.id, **dados.dict())
-    db.add(nova); db.commit(); db.refresh(nova); return nova
+    # LÓGICA DE HERANÇA (Para novos dias):
+    # Se o registo de hoje é novo, buscamos a última medida no histórico.
+    ultima = db.query(models.Evolucao).filter(
+        models.Evolucao.aluno_id == aluno.id
+    ).order_by(models.Evolucao.data_registro.desc()).first()
+    
+    # Se o aluno não enviou gordura ou músculo hoje, herdamos o valor anterior.
+    # Isso evita que o gráfico caia para zero em dias de preenchimento parcial.
+    gordura = dados.porcentagem_gordura if dados.porcentagem_gordura and dados.porcentagem_gordura > 0 else (ultima.porcentagem_gordura if ultima else 0)
+    musculo = dados.massa_muscular if dados.massa_muscular and dados.massa_muscular > 0 else (ultima.massa_muscular if ultima else 0)
+
+    nova = models.Evolucao(
+        aluno_id=aluno.id, 
+        peso=dados.peso, 
+        porcentagem_gordura=gordura, 
+        massa_muscular=musculo
+    )
+    db.add(nova)
+    db.commit()
+    db.refresh(nova)
+    return nova
 
 @app.get("/alunos/historico-treinos", response_model=List[schemas.TreinoFinalizadoResponse])
 def listar_historico_treinos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
