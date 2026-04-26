@@ -27,6 +27,7 @@ class Professor(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), unique=True)
     cref = Column(String, unique=True, nullable=True)
+    especialidade = Column(String, nullable=True)  # ← adicionar
 
     usuario = relationship("Usuario", back_populates="perfil_professor")
     alunos = relationship("Aluno", back_populates="professor")
