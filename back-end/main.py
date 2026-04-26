@@ -21,6 +21,9 @@ with engine.begin() as conn:
     conn.execute(text("ALTER TABLE itens_exercicio ALTER COLUMN carga TYPE VARCHAR USING carga::varchar"))
     conn.execute(text("ALTER TABLE itens_exercicio ALTER COLUMN exercicio_referencia_id TYPE VARCHAR USING exercicio_referencia_id::varchar"))
 
+    conn.execute(text("ALTER TABLE rotinas ADD COLUMN IF NOT EXISTS data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+    conn.execute(text("ALTER TABLE rotinas ADD COLUMN IF NOT EXISTS criado_por_professor BOOLEAN DEFAULT FALSE"))
+
 app = FastAPI(title="API Self-Fit - Sistema Total Integrado")
 
 app.add_middleware(
@@ -303,3 +306,57 @@ def feed_professor(email: str = Depends(auth.obter_usuario_atual), db: Session =
     for t in treinos: res.append({"id": f"pe_tr_{t.id}", "tipo": "TREINO", "usuario_nome": t.aluno.usuario.nome, "usuario_foto": t.aluno.usuario.foto_perfil, "titulo": f"Treino Concluído: {t.titulo}", "descricao": f"Levantou {t.volume_total}kg.", "data": t.data_fim})
     res.sort(key=lambda x: x['data'], reverse=True)
     return res[:30]
+
+@app.get("/treinos/detalhes/{treino_id}", response_model=schemas.TreinoFinalizadoResponse)
+def obter_detalhes_treino_universal(treino_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
+    # 1. Quem está pedindo?
+    requisitante = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # 2. Busca o treino
+    treino = db.query(models.TreinoRealizado).options(
+        joinedload(models.TreinoRealizado.exercicios)
+    ).filter(models.TreinoRealizado.id == treino_id).first()
+    
+    if not treino:
+        raise HTTPException(status_code=404, detail="Treino não encontrado.")
+
+    # 3. VALIDAÇÃO DE SEGURANÇA
+    dono_do_treino_id = treino.aluno.usuario_id
+    
+    # Se for o próprio dono, ou o professor dele, ou um seguidor aceito, permite ver.
+    is_owner = requisitante.id == dono_do_treino_id
+    is_professor = requisitante.tipo_perfil == "TEACHER" and treino.aluno.professor_id == requisitante.perfil_professor.id
+    
+    is_follower = db.query(models.Seguidor).filter(
+        models.Seguidor.seguidor_id == requisitante.id,
+        models.Seguidor.seguido_id == dono_do_treino_id,
+        models.Seguidor.status == "ACEITO"
+    ).first()
+
+    if not (is_owner or is_professor or is_follower):
+        raise HTTPException(status_code=403, detail="Você não tem permissão para ver os detalhes deste treino.")
+
+    return treino
+
+# --- 6.6 GESTÃO DE FICHAS PARA O PROFESSOR ---
+
+@app.get("/professor/fichas/modelos", response_model=List[schemas.FichaTreinoResponse])
+def listar_modelos_fichas_professor(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    """Retorna todas as fichas que este professor já criou (templates)"""
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    # Buscamos fichas criadas pelo professor (independente do aluno, ou modelos genéricos)
+    return db.query(models.FichaTreino).options(joinedload(models.FichaTreino.exercicios)).filter(
+        models.FichaTreino.criado_por_professor == True
+    ).all()
+
+@app.get("/professor/fichas/solicitacoes", response_model=List[schemas.RotinaResponse])
+def listar_solicitacoes_pendentes(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    """Busca alunos vinculados que estão com status 'pending' em suas rotinas"""
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    prof_id = u.perfil_professor.id
+    
+    # Busca rotinas pendentes de alunos que pertencem a este professor
+    return db.query(models.Rotina).join(models.Aluno).filter(
+        models.Aluno.professor_id == prof_id,
+        models.Rotina.status == "pending"
+    ).all()
