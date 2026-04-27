@@ -1,18 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-  Alert,
-  Modal,
+  SafeAreaView, View, Text, StyleSheet, TouchableOpacity,
+  FlatList, ActivityIndicator, Modal, ScrollView
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router'; // Adicionado useLocalSearchParams
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
@@ -20,19 +13,25 @@ import api from '../src/services/api';
 
 export default function PreviousWorkouts() {
   const router = useRouter();
+  const { studentId } = useLocalSearchParams(); // Captura o ID vindo do client_details
+  
   const [user, setUser] = useState<any>(null);
   const [workouts, setWorkouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkout, setSelectedWorkout] = useState<any | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  // --- BUSCA DADOS CONSOLIDADOS ---
   const loadData = async () => {
     try {
       setLoading(true);
-      // Buscamos o histórico e o perfil do usuário em paralelo
+      
+      // Define qual endpoint usar: histórico do aluno (Professor) ou próprio (Aluno)
+      const historyEndpoint = studentId 
+        ? `/professor/aluno/${studentId}/historico` 
+        : '/alunos/historico-treinos';
+
       const [historyRes, userRes] = await Promise.all([
-        api.get('/alunos/historico-treinos'),
+        api.get(historyEndpoint),
         api.get('/usuarios/me')
       ]);
       
@@ -45,11 +44,10 @@ export default function PreviousWorkouts() {
     }
   };
 
-  // Garante que os dados (incluindo o perfil para o footer) carreguem ao entrar na tela
   useFocusEffect(
     useCallback(() => {
       loadData();
-    }, [])
+    }, [studentId]) // Recarrega se o studentId mudar
   );
 
   function formatDate(iso: string) {
@@ -67,14 +65,14 @@ export default function PreviousWorkouts() {
     return (
       <View style={styles.loadingArea}>
         <ActivityIndicator color={colors.red} size="large" />
-        <Text style={{ color: colors.grayMid, marginTop: 10 }}>Carregando histórico...</Text>
+        <Text style={{ color: colors.grayMid, marginTop: 10 }}>Sincronizando treinos...</Text>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header title="Treinos Anteriores" />
+      <Header title={studentId ? "Histórico do Aluno" : "Meus Treinos"} />
 
       <FlatList
         data={workouts}
@@ -82,9 +80,10 @@ export default function PreviousWorkouts() {
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => openWorkoutModal(item)}>
             <View style={styles.cardLeft}>
-              <Text style={styles.cardTitle}>{item.titulo}</Text>
+              {/* Ajustei para aceitar 'titulo' ou 'nome_treino' dependendo do retorno da API */}
+              <Text style={styles.cardTitle}>{item.titulo || item.nome_treino}</Text>
               <Text style={styles.cardMeta}>
-                {formatDate(item.data_fim)} • {item.duracao_minutos} min
+                {formatDate(item.data_fim || item.data_conclusao)} • {item.duracao_minutos} min
               </Text>
               <Text style={styles.cardMeta}>
                 {item.exercicios?.length || 0} exercícios • {item.volume_total ? `${item.volume_total} kg` : '—'}
@@ -98,29 +97,26 @@ export default function PreviousWorkouts() {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <MaterialIcons name="history" size={60} color="#222" />
-            <Text style={styles.emptyText}>Você ainda não finalizou nenhum treino.</Text>
+            <Text style={styles.emptyText}>
+              {studentId ? "Este aluno ainda não registrou treinos." : "Você ainda não finalizou nenhum treino."}
+            </Text>
           </View>
         }
         contentContainerStyle={styles.listContent}
       />
 
-      {/* MODAL DE DETALHES */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
-        <TouchableOpacity 
-          style={styles.modalOverlay} 
-          activeOpacity={1} 
-          onPress={() => setModalVisible(false)}
-        >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setModalVisible(false)}>
           <View style={styles.modalCard}>
             {selectedWorkout && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>{selectedWorkout.titulo}</Text>
+                  <Text style={styles.modalTitle}>{selectedWorkout.titulo || selectedWorkout.nome_treino}</Text>
                   <Text style={styles.modalMeta}>
-                    {formatDate(selectedWorkout.data_fim)} • {selectedWorkout.duracao_minutos} min
+                    {formatDate(selectedWorkout.data_fim || selectedWorkout.data_conclusao)} • {selectedWorkout.duracao_minutos} min
                   </Text>
                 </View>
-                <View style={{ marginTop: 15 }}>
+                <ScrollView style={{ marginTop: 15 }} showsVerticalScrollIndicator={false}>
                   {selectedWorkout.exercicios && selectedWorkout.exercicios.length > 0 ? (
                     selectedWorkout.exercicios.map((ex: any, idx: number) => (
                       <View key={idx} style={styles.exerciseDetailRow}>
@@ -133,22 +129,23 @@ export default function PreviousWorkouts() {
                       </View>
                     ))
                   ) : (
-                    <Text style={{ color: colors.grayMid, textAlign: 'center' }}>
-                      Nenhum detalhe de exercício salvo.
+                    <Text style={{ color: colors.grayMid, textAlign: 'center', marginTop: 20 }}>
+                      Nenhum detalhe de exercício disponível.
                     </Text>
                   )}
-                </View>
+                </ScrollView>
               </>
             )}
           </View>
         </TouchableOpacity>
       </Modal>
 
-      {/* userProfile garante que o Halter apareça */}
       <StickyFooter active="workouts" userProfile={user?.tipo_perfil} />
     </SafeAreaView>
   );
 }
+
+// ... Seus estilos permanecem os mesmos ...
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },

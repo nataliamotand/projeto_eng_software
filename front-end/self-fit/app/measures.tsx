@@ -1,19 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Dimensions,
-  ActivityIndicator,
-  Alert
+  SafeAreaView, View, Text, StyleSheet, TouchableOpacity,
+  ScrollView, TextInput, Dimensions, ActivityIndicator, Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router'; // Adicionado useLocalSearchParams
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api';
 
@@ -21,6 +13,7 @@ const { width } = Dimensions.get('window');
 
 export default function Measures() {
   const router = useRouter();
+  const { id } = useLocalSearchParams(); // Captura o ID do aluno vindo do Perfil
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,28 +26,32 @@ export default function Measures() {
   const [measurementsHistory, setMeasurementsHistory] = useState<any[]>([]);
   const [selectedMetric, setSelectedMetric] = useState<'peso' | 'porcentagem_gordura' | 'massa_muscular'>('peso');
 
-  // 1. BUSCAR PERFIL E HISTÓRICO
+  // 1. BUSCAR PERFIL E HISTÓRICO (Híbrido)
   async function loadInitialData() {
     try {
       setLoading(true);
       
-      // Busca quem é o usuário logado
+      // Busca quem é o usuário logado para o Footer/Layout
       const userRes = await api.get('/usuarios/me');
       setUserRole(userRes.data.tipo_perfil);
 
-      // Busca o histórico
-      const historyRes = await api.get('/alunos/meu-historico');
+      // Define o endpoint: Se tem 'id', é o professor vendo o aluno. Se não, é o próprio usuário.
+      const endpoint = id 
+        ? `/professor/aluno/${id}/medidas` 
+        : '/alunos/meu-historico';
+
+      const historyRes = await api.get(endpoint);
       setMeasurementsHistory(historyRes.data);
       
-      if (historyRes.data.length > 0) {
-        const last = historyRes.data[historyRes.data.length - 1];
-        setWeight(last.peso.toString());
-        setBodyFat(last.porcentagem_gordura.toString());
-        setLeanMass(last.massa_muscular.toString());
+      // Preenche os campos de input com a última medida (se for o próprio aluno)
+      if (!id && historyRes.data.length > 0) {
+        const last = historyRes.data[0]; // Geralmente o mais recente vem primeiro no .desc()
+        setWeight(last.peso?.toString() || '');
+        setBodyFat(last.porcentagem_gordura?.toString() || '');
+        setLeanMass(last.massa_muscular?.toString() || '');
       }
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
-      // Se for um professor tentando ver o "meu-historico", o 403 cai aqui
     } finally {
       setLoading(false);
     }
@@ -62,10 +59,12 @@ export default function Measures() {
 
   useEffect(() => {
     loadInitialData();
-  }, []);
+  }, [id]);
 
-  // 2. REGISTRAR (SÓ PARA ALUNOS)
+  // 2. REGISTRAR (BLOQUEADO SE ESTIVER VENDO UM ALUNO)
   async function handleRegisterMeasurement() {
+    if (id) return; // Segurança extra
+
     if (!weight || !bodyFat || !leanMass) {
       Alert.alert("Atenção", "Preencha todos os campos.");
       return;
@@ -79,11 +78,8 @@ export default function Measures() {
         massa_muscular: parseFloat(leanMass)
       });
 
-      Alert.alert("Sucesso", "Medida processada! (Limite de 1 registro por dia aplicado)");
-      
-      // Atualiza o histórico para refletir a nova linha ou alteração no gráfico
-      const response = await api.get('/alunos/meu-historico');
-      setMeasurementsHistory(response.data);
+      Alert.alert("Sucesso", "Medida processada!");
+      loadInitialData(); // Recarrega o gráfico
     } catch (err) {
       Alert.alert("Erro", "Não foi possível salvar as medidas.");
     } finally {
@@ -91,32 +87,26 @@ export default function Measures() {
     }
   }
 
-// 3. FORMATAR DADOS PARA O GRÁFICO (CORRIGIDO PARA UTC)
-const chartData = useMemo(() => {
-  if (measurementsHistory.length === 0) return null;
+  // 3. FORMATAR DADOS PARA O GRÁFICO (Mantido, mas ordenando para o gráfico)
+  const chartData = useMemo(() => {
+    if (measurementsHistory.length === 0) return null;
 
-  const lastSix = measurementsHistory.slice(-6);
+    // Para o gráfico, precisamos da ordem cronológica (mais antigo -> mais novo)
+    const sortedData = [...measurementsHistory]
+      .sort((a, b) => new Date(a.data_registro).getTime() - new Date(b.data_registro).getTime())
+      .slice(-6);
 
-  const labels = lastSix.map((m) => {
-    // Criamos o objeto de data
-    const d = new Date(m.data_registro);
-    
-    // Usamos getUTCDate() para pegar o dia real do banco
-    const dia = d.getUTCDate(); 
-    
-    // Usamos toLocaleDateString com a opção timeZone: 'UTC' para o mês
-    const mes = d.toLocaleDateString('pt-BR', { 
-      month: 'short', 
-      timeZone: 'UTC' 
-    }).replace('.', '');
+    const labels = sortedData.map((m) => {
+      const d = new Date(m.data_registro);
+      const dia = d.getUTCDate(); 
+      const mes = d.toLocaleDateString('pt-BR', { month: 'short', timeZone: 'UTC' }).replace('.', '');
+      return `${dia}/${mes}`;
+    });
 
-    return `${dia}/${mes}`;
-  });
+    const data = sortedData.map((m) => m[selectedMetric] || 0);
 
-  const data = lastSix.map((m) => m[selectedMetric]);
-
-  return { labels, data };
-}, [measurementsHistory, selectedMetric]);
+    return { labels, data };
+  }, [measurementsHistory, selectedMetric]);
 
   if (loading) {
     return (
@@ -133,15 +123,15 @@ const chartData = useMemo(() => {
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {userRole === 'TEACHER' ? 'Evolução do Aluno' : 'Minha Evolução'}
+          {id ? 'Evolução do Aluno' : 'Minha Evolução'}
         </Text>
         <View style={styles.headerRight} />
       </View>
 
       <ScrollView contentContainerStyle={styles.contentContainer}>
         
-        {/* SÓ MOSTRA INPUTS SE FOR ALUNO */}
-        {userRole === 'STUDENT' ? (
+        {/* LÓGICA DE EXIBIÇÃO: Se tiver 'id' no param, é modo leitura para o professor */}
+        {(!id && userRole === 'STUDENT') ? (
           <>
             <View style={styles.rowInputs}>
               <View style={styles.colInputRow}>
@@ -189,57 +179,52 @@ const chartData = useMemo(() => {
           </>
         ) : (
           <View style={styles.teacherNotice}>
-            <Ionicons name="eye-outline" size={20} color={colors.grayMid} />
-            <Text style={styles.teacherNoticeText}>Modo de visualização (Apenas leitura)</Text>
+            <Ionicons name="stats-chart" size={20} color={colors.red} />
+            <Text style={styles.teacherNoticeText}>
+              {id ? "Acompanhando progresso do aluno" : "Visualizando seu histórico"}
+            </Text>
           </View>
         )}
 
         <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Gráfico de Evolução</Text>
 
         <View style={styles.metricTabs}>
-          <TouchableOpacity 
-            style={[styles.metricTab, selectedMetric === 'peso' && styles.metricTabActive]} 
-            onPress={() => setSelectedMetric('peso')}
-          >
-            <Text style={styles.metricTabText}>Peso</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.metricTab, selectedMetric === 'porcentagem_gordura' && styles.metricTabActive]} 
-            onPress={() => setSelectedMetric('porcentagem_gordura')}
-          >
-            <Text style={styles.metricTabText}>% BF</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.metricTab, selectedMetric === 'massa_muscular' && styles.metricTabActive]} 
-            onPress={() => setSelectedMetric('massa_muscular')}
-          >
-            <Text style={styles.metricTabText}>Músculo</Text>
-          </TouchableOpacity>
+          {['peso', 'porcentagem_gordura', 'massa_muscular'].map((metric) => (
+            <TouchableOpacity 
+              key={metric}
+              style={[styles.metricTab, selectedMetric === metric && styles.metricTabActive]} 
+              onPress={() => setSelectedMetric(metric as any)}
+            >
+              <Text style={styles.metricTabText}>
+                {metric === 'peso' ? 'Peso' : metric === 'porcentagem_gordura' ? '% BF' : 'Músculo'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {chartData ? (
+        {chartData && chartData.data.length > 0 ? (
           <LineChart
             data={{
               labels: chartData.labels,
-              datasets: [{ data: chartData.data, color: () => colors.red, strokeWidth: 2 }],
+              datasets: [{ data: chartData.data, color: () => colors.red, strokeWidth: 3 }],
             }}
             width={width - 32}
             height={220}
             chartConfig={{
               backgroundColor: colors.background,
-              backgroundGradientFrom: colors.background,
-              backgroundGradientTo: colors.background,
+              backgroundGradientFrom: '#0A0A0A',
+              backgroundGradientTo: '#0A0A0A',
               decimalPlaces: 1,
               color: (opacity = 1) => `rgba(204,0,0,${opacity})`,
               labelColor: () => colors.grayLight,
-              propsForDots: { r: '4', strokeWidth: '1', stroke: colors.white },
+              propsForDots: { r: '5', strokeWidth: '2', stroke: colors.white },
             }}
             bezier
-            style={{ marginVertical: 16, borderRadius: 12 }}
+            style={{ marginVertical: 16, borderRadius: 15, paddingRight: 40 }}
           />
         ) : (
           <View style={styles.emptyChart}>
-            <Text style={{ color: colors.grayMid }}>Nenhum histórico disponível.</Text>
+            <Text style={{ color: colors.grayMid }}>Nenhum dado para exibir no gráfico.</Text>
           </View>
         )}
       </ScrollView>
@@ -247,6 +232,7 @@ const chartData = useMemo(() => {
   );
 }
 
+// ... Estilos originais mantidos ...
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 40, paddingBottom: 12, backgroundColor: colors.background },
