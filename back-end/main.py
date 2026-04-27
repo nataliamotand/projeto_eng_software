@@ -153,14 +153,31 @@ def atualizar_objetivo(
 
 # --- 3. EXECUÇÃO, EVOLUÇÃO E HISTÓRICO ---
 
+# --- main.py ---
 @app.post("/alunos/finalizar-treino")
 def finalizar_treino(dados: schemas.TreinoFinalizadoCreate, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    novo_treino = models.TreinoRealizado(aluno_id=u.perfil_aluno.id, titulo=dados.titulo, duracao_minutos=dados.duracao_minutos, volume_total=dados.volume_total, data_fim=datetime.utcnow())
-    db.add(novo_treino); db.flush()
+    
+    # Lógica: Se vier data no JSON, usa ela. Se não vier, usa o agora (UTC).
+    # Isso permite que você suba treinos retroativos pelo Swagger para testar os gráficos.
+    data_do_treino = getattr(dados, 'data_fim', None) or datetime.utcnow()
+    
+    novo_treino = models.TreinoRealizado(
+        aluno_id=u.perfil_aluno.id, 
+        titulo=dados.titulo, 
+        duracao_minutos=dados.duracao_minutos, 
+        volume_total=dados.volume_total, 
+        data_fim=data_do_treino # Garante que o registro no banco SEMPRE tenha data
+    )
+    
+    db.add(novo_treino)
+    db.flush()
+    
     for ex in dados.exercicios:
         db.add(models.ExercicioRealizado(treino_id=novo_treino.id, **ex.dict()))
-    db.commit(); return {"status": "sucesso", "id": novo_treino.id}
+    
+    db.commit()
+    return {"status": "sucesso", "id": novo_treino.id}
 
 @app.get("/alunos/meu-historico", response_model=List[schemas.EvolucaoResponse])
 def meu_historico_evolucao(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):

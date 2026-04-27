@@ -158,6 +158,7 @@ class TreinoFinalizadoCreate(BaseModel):
     titulo: str
     duracao_minutos: int
     volume_total: float
+    data_fim: Optional[datetime] = None
     exercicios: List[ExercicioRealizadoBase] 
 
 class TreinoFinalizadoResponse(BaseModel):

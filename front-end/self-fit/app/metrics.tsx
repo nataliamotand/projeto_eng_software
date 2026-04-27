@@ -19,27 +19,29 @@ import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api';
 
 const { width } = Dimensions.get('window');
-
-// Paleta sofisticada
 const MUTED_RED = '#B00000'; 
-const BG_DARK = '#000';
 
+// Mapeamento expandido para identificação de grupos musculares
 const MUSCLE_MAPPING: Record<string, string> = {
-  'Supino': 'Peito', 'Crucifixo': 'Peito', 'Flexão': 'Peito',
-  'Remada': 'Costas', 'Puxada': 'Costas', 'Barra': 'Costas',
-  'Agachamento': 'Pernas', 'Leg Press': 'Pernas', 'Extensora': 'Pernas',
-  'Desenvolvimento': 'Ombro', 'Elevação': 'Ombro',
-  'Prancha': 'Core', 'Abdominal': 'Core'
+  'Supino': 'Peito', 'Crucifixo': 'Peito', 'Flexão': 'Peito', 'Pec Deck': 'Peito',
+  'Remada': 'Costas', 'Puxada': 'Costas', 'Barra': 'Costas', 'Serrote': 'Costas',
+  'Agachamento': 'Pernas', 'Leg Press': 'Pernas', 'Extensora': 'Pernas', 'Afundo': 'Pernas',
+  'Desenvolvimento': 'Ombro', 'Elevação': 'Ombro', 'Deltoide': 'Ombro',
+  'Prancha': 'Core', 'Abdominal': 'Core', 'Infra': 'Core',
+  'Rosca': 'Bíceps', 'Martelo': 'Bíceps', 
+  'Tríceps': 'Tríceps', 'Pulley': 'Tríceps', 'Corda': 'Tríceps'
 };
 
 const chartConfig = {
-  backgroundGradientFrom: BG_DARK,
-  backgroundGradientTo: BG_DARK,
+  backgroundGradientFrom: '#000',
+  backgroundGradientTo: '#000',
   decimalPlaces: 0,
   color: (opacity = 1) => `rgba(176, 0, 0, ${opacity})`,
   labelColor: (opacity = 1) => `rgba(160, 160, 160, ${opacity})`,
   style: { borderRadius: 16 },
   propsForBackgroundLines: { strokeWidth: 0.1, stroke: '#333' },
+  // Ajuste: Barras robustas para melhor visualização
+  barPercentage: 0.7, 
 };
 
 export default function Metrics(): JSX.Element {
@@ -51,7 +53,7 @@ export default function Metrics(): JSX.Element {
   const [processedData, setProcessedData] = useState<any>(null);
   const [mainStatus, setMainStatus] = useState<any>(null);
 
-  // Calcula intervalos de datas reais
+  // Calcula o intervalo real da semana (Domingo a Sábado)
   const getWeekRange = (weeksAgo: number) => {
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -67,27 +69,50 @@ export default function Metrics(): JSX.Element {
     const weekLabels = [getWeekRange(3), getWeekRange(2), getWeekRange(1), getWeekRange(0)];
     const frequency = [0, 0, 0, 0];
     const volume = [0, 0, 0, 0];
-    const muscleCount: Record<string, number> = { Peito: 0, Costas: 0, Pernas: 0, Ombro: 0, Core: 0 };
+    const muscleCount: Record<string, number> = { 
+      Peito: 0, Costas: 0, Pernas: 0, Ombro: 0, Core: 0, Bíceps: 0, Tríceps: 0, Outros: 0 
+    };
     const prs: Record<string, { weight: number, date: string }> = {};
     let totalMinutes = 0;
-
     const now = new Date();
     
+    // Início da semana atual para alinhar o calendário
+    const startOfCurrentWeek = new Date(now);
+    startOfCurrentWeek.setHours(0, 0, 0, 0);
+    startOfCurrentWeek.setDate(now.getDate() - now.getDay());
+
     history.forEach(workout => {
-      const workoutDate = new Date(workout.data_fim);
-      const diffWeeks = Math.floor((now.getTime() - workoutDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      totalMinutes += workout.duracao_minutos || 0;
+      const workoutDate = workout.data_fim ? new Date(workout.data_fim) : new Date();
+      if (isNaN(workoutDate.getTime())) return; 
+
+      // Início da semana do treino (domingo correspondente)
+      const startOfWorkoutWeek = new Date(workoutDate);
+      startOfWorkoutWeek.setHours(0, 0, 0, 0);
+      startOfWorkoutWeek.setDate(workoutDate.getDate() - workoutDate.getDay());
+
+      // Diferença exata em janelas de 7 dias
+      const diffWeeks = Math.round((startOfCurrentWeek.getTime() - startOfWorkoutWeek.getTime()) / (1000 * 60 * 60 * 24 * 7));
       
-      if (diffWeeks < 4) {
-        frequency[3 - diffWeeks]++;
-        volume[3 - diffWeeks] += workout.volume_total || 0;
+      totalMinutes += Number(workout.duracao_minutos) || 0;
+      
+      if (diffWeeks >= 0 && diffWeeks < 4) {
+        const weekIdx = 3 - diffWeeks;
+        frequency[weekIdx]++;
+        volume[weekIdx] += Number(workout.volume_total) || 0;
       }
 
       workout.exercicios?.forEach((ex: any) => {
+        let matched = false;
+        const exerciseName = ex.nome.toLowerCase();
         Object.keys(MUSCLE_MAPPING).forEach(key => {
-          if (ex.nome.includes(key)) muscleCount[MUSCLE_MAPPING[key]]++;
+          if (exerciseName.includes(key.toLowerCase())) {
+            muscleCount[MUSCLE_MAPPING[key]]++;
+            matched = true;
+          }
         });
-        const load = parseFloat(ex.carga.replace('kg', '')) || 0;
+        if (!matched) muscleCount['Outros']++;
+
+        const load = parseFloat(ex.carga?.replace('kg', '')) || 0;
         if (!prs[ex.nome] || load > prs[ex.nome].weight) {
           prs[ex.nome] = { weight: load, date: workoutDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) };
         }
@@ -101,19 +126,20 @@ export default function Metrics(): JSX.Element {
     });
 
     setProcessedData({
-      totalMonth: history.filter(w => new Date(w.data_fim).getMonth() === now.getMonth()).length,
+      totalMonth: history.filter(w => w.data_fim && new Date(w.data_fim).getMonth() === now.getMonth()).length,
       avgTime: Math.round(totalMinutes / (history.length || 1)),
       frequency: { 
         labels: weekLabels, 
         datasets: [{ 
           data: frequency,
-          // Cores: Destaque total na semana atual
-          colors: frequency.map((_, i) => (opacity = 1) => i === 3 ? `rgba(176, 0, 0, 1)` : `rgba(176, 0, 0, 0.3)`)
+          // Cor sólida para a semana atual
+          colors: frequency.map((_, i) => (opacity = 1) => i === 3 ? `rgba(217, 0, 0, 1)` : `rgba(217, 0, 0, 0.4)`)
         }] 
       },
       volume: { labels: weekLabels, datasets: [{ data: volume }] },
       muscleDistribution: Object.keys(muscleCount).map((name, idx) => ({
-        name, population: muscleCount[name], color: ['#800000', '#5C0000', '#B00000', '#420000', '#2B0000'][idx],
+        name, population: muscleCount[name], 
+        color: ['#800000', '#5C0000', '#B00000', '#420000', '#2B0000', '#A52A2A', '#D2691E', '#333'][idx] || '#444',
         legendFontColor: '#AAA', legendFontSize: 11,
       })).filter(m => m.population > 0),
       prs: Object.entries(prs).map(([exercise, info]) => ({ exercise, ...info })).sort((a, b) => b.weight - a.weight).slice(0, 3)
@@ -125,7 +151,7 @@ export default function Metrics(): JSX.Element {
       setLoading(true);
       const res = await api.get(studentId ? `/professor/aluno/${studentId}/historico` : '/alunos/historico-treinos');
       processMetrics(res.data);
-    } catch (err) { Alert.alert("Erro", "Falha nas métricas."); } finally { setLoading(false); }
+    } catch (err) { Alert.alert("Erro", "Falha ao carregar métricas."); } finally { setLoading(false); }
   };
 
   useEffect(() => { loadData(); }, [studentId]);
@@ -137,7 +163,6 @@ export default function Metrics(): JSX.Element {
       <Header title="Performance Técnica" />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* HERO STATS SIMÉTRICOS */}
         <View style={styles.heroContainer}>
           <View style={styles.heroCard}>
             <Text style={styles.heroValue}>{processedData?.totalMonth}</Text>
@@ -150,7 +175,6 @@ export default function Metrics(): JSX.Element {
           </View>
         </View>
 
-        {/* STATUS BANNER EDGE-TO-EDGE */}
         <View style={styles.fullWidthStatus}>
           <MaterialCommunityIcons name={mainStatus?.icon} size={20} color={MUTED_RED} />
           <View style={{marginLeft: 15}}>
@@ -159,7 +183,7 @@ export default function Metrics(): JSX.Element {
           </View>
         </View>
 
-        {/* FREQUÊNCIA SEMANAL (FIXADA 0-7 SEM FANTASMAS) */}
+        {/* FREQUÊNCIA: Barras largas com contagem exata no topo */}
         <View style={styles.dataSection}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="calendar-check" size={18} color={MUTED_RED} />
@@ -169,19 +193,17 @@ export default function Metrics(): JSX.Element {
             <BarChart 
               data={processedData?.frequency} 
               width={width - 40} 
-              height={200} 
+              height={220} 
               fromZero 
-              segments={7} // Define o eixo Y fixo em 7 sem precisar de dado extra
+              showValuesOnTopOfBars={true} 
               withCustomBarColorFromData={true}
               flatColor={true}
               chartConfig={chartConfig} 
               style={styles.chart} 
-              showValuesOnTopOfBars={true} 
             />
           </View>
         </View>
 
-        {/* DISTRIBUIÇÃO MUSCULAR */}
         <View style={styles.dataSection}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="chart-donut" size={18} color={MUTED_RED} />
@@ -189,19 +211,13 @@ export default function Metrics(): JSX.Element {
           </View>
           <View style={styles.chartContainer}>
             <PieChart 
-              data={processedData?.muscleDistribution} 
-              width={width - 40} 
-              height={180} 
-              accessor="population" 
-              backgroundColor="transparent" 
-              chartConfig={chartConfig} 
-              hasLegend 
-              absolute 
+              data={processedData?.muscleDistribution} width={width - 40} height={180} accessor="population" 
+              backgroundColor="transparent" chartConfig={chartConfig} hasLegend absolute 
             />
           </View>
         </View>
 
-        {/* VOLUME DE CARGA */}
+        {/* VOLUME DE CARGA: Progressão temporal real */}
         <View style={styles.dataSection}>
           <View style={styles.sectionHeader}>
             <MaterialCommunityIcons name="chart-line" size={18} color={MUTED_RED} />
@@ -209,17 +225,13 @@ export default function Metrics(): JSX.Element {
           </View>
           <View style={styles.chartContainer}>
             <LineChart 
-              data={processedData?.volume} 
-              width={width - 40} 
-              height={180} 
+              data={processedData?.volume} width={width - 40} height={180} 
               chartConfig={{...chartConfig, color: (opacity) => `rgba(200, 200, 200, ${opacity})` }} 
-              bezier 
-              style={styles.chart} 
+              bezier style={styles.chart} 
             />
           </View>
         </View>
 
-        {/* RECORDES PESSOAIS */}
         <View style={{paddingHorizontal: 20}}>
           <Text style={styles.mainHeading}>Recordes Pessoais (PRs)</Text>
           {processedData?.prs.map((pr: any, i: number) => (
@@ -229,10 +241,7 @@ export default function Metrics(): JSX.Element {
                 <Text style={styles.prName}>{pr.exercise}</Text>
                 <Text style={styles.prDate}>{pr.date}</Text>
               </View>
-              <View style={styles.prValue}>
-                <Text style={styles.prWeight}>{pr.weight}</Text>
-                <Text style={styles.prUnit}>KG</Text>
-              </View>
+              <View style={styles.prValue}><Text style={styles.prWeight}>{pr.weight}</Text><Text style={styles.prUnit}>KG</Text></View>
             </View>
           ))}
         </View>
