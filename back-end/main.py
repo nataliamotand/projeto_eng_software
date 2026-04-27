@@ -156,11 +156,23 @@ def atualizar_objetivo(
 @app.post("/alunos/finalizar-treino")
 def finalizar_treino(dados: schemas.TreinoFinalizadoCreate, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    novo_treino = models.TreinoRealizado(aluno_id=u.perfil_aluno.id, titulo=dados.titulo, duracao_minutos=dados.duracao_minutos, volume_total=dados.volume_total, data_fim=datetime.utcnow())
-    db.add(novo_treino); db.flush()
+    
+    # Integração: Permite injetar data para testes de gráficos (Natália)
+    data_registro = dados.data_fim or datetime.utcnow()
+    
+    novo_treino = models.TreinoRealizado(
+        aluno_id=u.perfil_aluno.id, 
+        titulo=dados.titulo, 
+        duracao_minutos=dados.duracao_minutos, 
+        volume_total=dados.volume_total, 
+        data_fim=data_registro
+    )
+    db.add(novo_treino)
+    db.flush()
     for ex in dados.exercicios:
         db.add(models.ExercicioRealizado(treino_id=novo_treino.id, **ex.dict()))
-    db.commit(); return {"status": "sucesso", "id": novo_treino.id}
+    db.commit()
+    return {"status": "sucesso", "id": novo_treino.id}
 
 @app.get("/alunos/meu-historico", response_model=List[schemas.EvolucaoResponse])
 def meu_historico_evolucao(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
@@ -403,3 +415,28 @@ def buscar_medidas_aluno(
     ).order_by(models.Evolucao.data_registro.desc()).all()
 
     return evolucoes
+
+@app.get("/treinos/detalhes/{treino_id}", response_model=schemas.TreinoFinalizadoResponse)
+def obter_detalhes_treino(treino_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
+    # Correção do 404: Busca detalhes do treino finalizado
+    treino = db.query(models.TreinoRealizado).options(joinedload(models.TreinoRealizado.exercicios)).filter(models.TreinoRealizado.id == treino_id).first()
+    if not treino:
+        raise HTTPException(status_code=404, detail="Treino não encontrado")
+    return treino
+
+@app.get("/professor/aluno/{aluno_id}/metricas-performance")
+def obter_metricas_performance(aluno_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # Valida vínculo
+    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id, models.Aluno.professor_id == u.perfil_professor.id).first()
+    if not aluno:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+
+    evolucoes = db.query(models.Evolucao).filter(models.Evolucao.aluno_id == aluno_id).order_by(models.Evolucao.data_registro.asc()).all()
+    treinos = db.query(models.TreinoRealizado).filter(models.TreinoRealizado.aluno_id == aluno_id).order_by(models.TreinoRealizado.data_fim.asc()).all()
+
+    return {
+        "composicao_corporal": evolucoes,
+        "volume_treino": [{"data": t.data_fim, "volume": t.volume_total} for t in treinos]
+    }

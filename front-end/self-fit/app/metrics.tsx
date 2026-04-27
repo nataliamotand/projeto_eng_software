@@ -1,225 +1,182 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Dimensions,
+  SafeAreaView, View, Text, StyleSheet, TouchableOpacity,
+  ScrollView, Dimensions, ActivityIndicator
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, FontAwesome } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
-import { colors as themeColors } from '../src/components/ui/theme';
-import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import { colors } from '../src/components/ui/theme';
+import { BarChart, LineChart } from 'react-native-chart-kit';
+import api from '../src/services/api';
 
-const { width, height } = Dimensions.get('window');
-
-// Function to generate mocked data optionally based on studentId
-function generateMocks(studentId?: string | number) {
-  const idNum = Number(studentId) || 0;
-
-  const baseFreq = [3, 4, 2, 5];
-  const freq = baseFreq.map((v, i) => v + ((idNum + i) % 3));
-
-  const muscleBase = [
-    { name: 'Peito', population: 20, color: '#B22222' },
-    { name: 'Costas', population: 20, color: '#8B0000' },
-    { name: 'Pernas', population: 40, color: '#CC0000' },
-    { name: 'Ombro', population: 10, color: '#6B0F0F' },
-    { name: 'Core', population: 10, color: '#4F4F4F' },
-  ];
-
-  // shift distribution slightly by id
-  const muscleDistribution = muscleBase.map((m, idx) => ({
-    name: m.name,
-    population: m.population + ((idNum + idx) % 5) - 2,
-    color: m.color,
-    legendFontColor: colors.lightGray,
-    legendFontSize: 12,
-  }));
-
-  const baseVolume = [12000, 13500, 11000, 15000];
-  const volume = baseVolume.map((v, i) => v + ((idNum * 250) % 2000) - i * 200);
-
-  const prs = [
-    { id: 1, exercise: 'Agachamento Livre', weight: `${120 + (idNum % 10)}kg`, date: '12/Mar' },
-    { id: 2, exercise: 'Supino Reto', weight: `${80 + (idNum % 6)}kg`, date: '05/Abr' },
-    { id: 3, exercise: 'Levantamento Terra', weight: `${150 + (idNum % 12)}kg`, date: '20/Fev' },
-  ];
-
-  return {
-    mockFrequency: { labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], datasets: [{ data: freq }] },
-    mockMuscleDistribution: muscleDistribution,
-    mockVolume: { labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], datasets: [{ data: volume }] },
-    mockPRs: prs,
-  };
-}
+const { width } = Dimensions.get('window');
 
 const chartConfig = {
   backgroundGradientFrom: colors.background,
   backgroundGradientTo: colors.background,
-  decimalPlaces: 0,
-  color: (opacity = 1) => `rgba(204,0,0,${opacity})`,
-  labelColor: (opacity = 1) => `rgba(207,207,207,${opacity})`,
-  propsForDots: {
-    r: '4',
-    strokeWidth: '2',
-    stroke: colors.white,
-  },
-  style: { borderRadius: 8 },
+  decimalPlaces: 1,
+  color: (opacity = 1) => `rgba(204, 0, 0, ${opacity})`,
+  labelColor: () => colors.lightGray,
+  propsForDots: { r: '4', strokeWidth: '2', stroke: colors.white },
+  style: { borderRadius: 12 },
 };
 
-export default function Metrics(): JSX.Element {
+export default function Metrics() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const studentId = (params as any)?.studentId;
-  const chartWidth = Math.min(width - 32, 760);
+  
+  // Captura o ID do aluno (modo professor) ou fica undefined (modo aluno)
+  const studentId = params.studentId || params.id;
 
-  const { mockFrequency, mockMuscleDistribution, mockVolume, mockPRs } = generateMocks(studentId);
+  const [loading, setLoading] = useState(true);
+  const [evolutionData, setEvolutionData] = useState<any[]>([]);
+  const [trainingHistory, setTrainingHistory] = useState<any[]>([]);
+  const [userRole, setUserRole] = useState<string>('');
+
+  const loadMetrics = async () => {
+    try {
+      setLoading(true);
+
+      // 1. Identifica o perfil para o StickyFooter
+      const userRes = await api.get('/usuarios/me');
+      setUserRole(userRes.data.tipo_perfil);
+
+      // 2. Define os endpoints baseado no contexto (Professor vs Aluno)
+      // Se tiver studentId, usa as rotas de professor consolidada na main.py
+      const evoEndpoint = studentId 
+        ? `/professor/aluno/${studentId}/medidas` 
+        : '/alunos/meu-historico';
+      
+      const trainEndpoint = studentId 
+        ? `/professor/aluno/${studentId}/historico` 
+        : '/alunos/historico-treinos';
+
+      const [evoRes, trainRes] = await Promise.all([
+        api.get(evoEndpoint),
+        api.get(trainEndpoint)
+      ]);
+      
+      setEvolutionData(evoRes.data);
+      setTrainingHistory(trainRes.data);
+    } catch (err) {
+      console.error("Erro ao carregar métricas:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMetrics();
+  }, [studentId]);
+
+  // Processa Volume Total (Carga)
+  const volumeChart = useMemo(() => {
+    if (!trainingHistory || trainingHistory.length === 0) return null;
+    const lastFive = [...trainingHistory].reverse().slice(-5);
+    return {
+      labels: lastFive.map(t => new Date(t.data_fim).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })),
+      datasets: [{ data: lastFive.map(t => t.volume_total || 0) }]
+    };
+  }, [trainingHistory]);
+
+  // Processa BF e Massa Muscular
+  const bodyCompChart = useMemo(() => {
+    if (!evolutionData || evolutionData.length === 0) return null;
+    const lastFive = [...evolutionData].reverse().slice(-5);
+    return {
+      labels: lastFive.map(e => new Date(e.data_registro).getDate().toString()),
+      datasets: [
+        { data: lastFive.map(e => e.porcentagem_gordura || 0), color: () => colors.red },
+        { data: lastFive.map(e => e.massa_muscular || 0), color: () => colors.white }
+      ],
+      legend: ["% BF", "Músculo (kg)"]
+    };
+  }, [evolutionData]);
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator size="large" color={colors.red} /></View>;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="Métricas de Treino" right={<TouchableOpacity onPress={() => {}}><Ionicons name="share-outline" size={22} color={themeColors.white} /></TouchableOpacity>} />
+      <Header title={studentId ? "Métricas do Aluno" : "Minha Performance"} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Consistência */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{studentId ? `Métricas do Aluno #${studentId}` : 'Frequência Semanal'}</Text>
-          <View style={styles.rowSummary}>
-            <MaterialCommunityIcons name="fire" size={16} color={colors.red} />
-            <Text style={styles.summaryText}>  Total no Mês: <Text style={styles.summaryHighlight}>14 treinos</Text></Text>
-          </View>
-
-          <BarChart
-            data={mockFrequency}
-            width={chartWidth}
-            height={220}
-            fromZero
-            withInnerLines={false}
-            chartConfig={{
-              ...chartConfig,
-              fillShadowGradient: colors.red,
-              fillShadowGradientOpacity: 1,
-              barPercentage: 0.6,
-            }}
-            style={styles.chart}
-            showValuesOnTopOfBars={true}
-            yLabelsOffset={6}
-          />
-        </View>
-
-        {/* Distribuição Muscular */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mapa de Treino</Text>
-          <PieChart
-            data={mockMuscleDistribution}
-            width={chartWidth}
-            height={160}
-            accessor="population"
-            backgroundColor="transparent"
-            paddingLeft={0}
-            chartConfig={chartConfig}
-            hasLegend={true}
-            absolute={true}
-          />
-        </View>
-
-        {/* Evolução de Volume */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Volume de Treino (Carga Total)</Text>
-          <Text style={styles.sectionSubtitle}>Acompanhe a soma de peso levantado por semana.</Text>
-
-          <LineChart
-            data={mockVolume}
-            width={chartWidth}
-            height={220}
-            withInnerLines={false}
-            withShadow={false}
-            chartConfig={{
-              ...chartConfig,
-              color: (opacity = 1) => `rgba(204,0,0,${opacity})`,
-            }}
-            bezier
-            style={styles.chart}
-          />
+          {volumeChart ? (
+            <BarChart
+              data={volumeChart}
+              width={width - 32}
+              height={220}
+              fromZero
+              yAxisLabel=""
+              yAxisSuffix="kg"
+              chartConfig={{ ...chartConfig, barPercentage: 0.7 }}
+              style={styles.chart}
+              showValuesOnTopOfBars
+            />
+          ) : (
+            <View style={styles.emptyCard}><Text style={styles.emptyText}>Sem treinos finalizados.</Text></View>
+          )}
         </View>
 
-        {/* Recordes Pessoais */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recordes Pessoais (PRs)</Text>
-          <View style={{ marginTop: 8 }}>
-            {mockPRs.map((pr) => (
-              <View key={pr.id} style={styles.prCard}>
-                <View style={styles.prLeft}>
-                  <MaterialCommunityIcons name="trophy" size={20} color={colors.gold} />
-                  <Text style={styles.prExercise}>{pr.exercise}</Text>
-                </View>
-
-                <View style={styles.prRight}>
-                  <Text style={styles.prWeight}>{pr.weight}</Text>
-                  <Text style={styles.prDate}>{pr.date}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.sectionTitle}>Composição Corporal</Text>
+          {bodyCompChart ? (
+            <LineChart
+              data={bodyCompChart}
+              width={width - 32}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix=""
+              chartConfig={chartConfig}
+              bezier
+              style={styles.chart}
+            />
+          ) : (
+            <View style={styles.emptyCard}><Text style={styles.emptyText}>Sem medidas registradas.</Text></View>
+          )}
         </View>
 
-        <View style={styles.footerNote}>
-          <Text style={styles.footerText}>© Self-fit</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Recordes Recentes</Text>
+          {trainingHistory.length > 0 ? (
+            trainingHistory
+              .sort((a, b) => b.volume_total - a.volume_total)
+              .slice(0, 3)
+              .map((item, idx) => (
+                <View key={idx} style={styles.prCard}>
+                  <View style={styles.prLeft}>
+                    <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+                    <Text style={styles.prExercise}>{item.titulo || 'Treino Concluído'}</Text>
+                  </View>
+                  <Text style={styles.prWeight}>{item.volume_total}kg</Text>
+                </View>
+              ))
+          ) : (
+            <Text style={styles.emptyText}>Nenhum registro encontrado.</Text>
+          )}
         </View>
-        <StickyFooter showNav={false} />
       </ScrollView>
+      <StickyFooter active="workouts" userProfile={userRole} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#070707',
-  },
-  headerLeft: { width: 40 },
-  headerRight: { width: 40, alignItems: 'flex-end' },
-  headerTitle: { color: colors.white, fontWeight: '700', fontSize: 18 },
-
-  scrollContent: { padding: 16, paddingBottom: Math.max(48, height * 0.12) },
-  section: { marginBottom: 20 },
-  sectionTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 8 },
-  sectionSubtitle: { color: colors.lightGray, fontSize: 12, marginBottom: 8 },
-  rowSummary: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  summaryText: { color: colors.lightGray, marginLeft: 6 },
-  summaryHighlight: { color: colors.white, fontWeight: '700' },
-
-  chart: { marginVertical: 8, borderRadius: 8 },
-
-  prCard: {
-    backgroundColor: colors.darkGray,
-    borderRadius: 10,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  prLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  prExercise: { color: colors.white, fontWeight: '700', marginLeft: 10, flexShrink: 1 },
-  prRight: { alignItems: 'flex-end' },
-  prWeight: { color: colors.white, fontWeight: '800', fontSize: 14 },
-  prDate: { color: colors.lightGray, fontSize: 12 },
-
-  footerNote: { alignItems: 'center', marginTop: 8 },
-  footerText: { color: colors.lightGray, fontSize: 12 },
+  container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+  scrollContent: { padding: 16, paddingBottom: 100 },
+  section: { marginBottom: 30 },
+  sectionTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  chart: { borderRadius: 12 },
+  emptyCard: { height: 100, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111', borderRadius: 12 },
+  emptyText: { color: colors.grayMid },
+  prCard: { backgroundColor: '#111', padding: 16, borderRadius: 12, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  prLeft: { flexDirection: 'row', alignItems: 'center' },
+  prExercise: { color: colors.white, fontWeight: '700', marginLeft: 10 },
+  prWeight: { color: colors.red, fontWeight: '800' },
 });

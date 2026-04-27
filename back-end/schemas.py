@@ -26,6 +26,8 @@ class UsuarioResponse(BaseModel):
 class UsuarioPerfilUpdate(BaseModel):
     nome: Optional[str] = None
     foto_perfil: Optional[str] = None
+    objetivo: Optional[str] = None      # Integrado do Perfil
+    especialidade: Optional[str] = None # Integrado do Perfil
 
 # --- 2. PERFIS ESPECÍFICOS ---
 class ProfessorCreate(BaseModel):

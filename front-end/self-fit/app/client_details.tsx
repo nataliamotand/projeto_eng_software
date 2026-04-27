@@ -130,8 +130,11 @@ export default function ClientDetails() {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.menuItem} 
-            onPress={() => router.push(`/metrics?studentId=${id}`)}
+            style={styles.menuItem}
+            onPress={() => router.push({ 
+              pathname: '/metrics', 
+              params: { studentId: id } // 'id' é o ID do aluno que você pegou do useLocalSearchParams
+            })}
           >
             <View style={[styles.iconBox, { backgroundColor: '#1A1A1A' }]}>
               <MaterialIcons name="show-chart" size={22} color="#4A90E2" />
