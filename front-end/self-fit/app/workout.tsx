@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  View, Text, StyleSheet, SafeAreaView, TouchableOpacity, 
-  ActivityIndicator, Alert, Platform 
+import {
+  View, Text, StyleSheet, SafeAreaView, TouchableOpacity,
+  ActivityIndicator, Alert, Platform
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -11,7 +11,7 @@ import { colors } from '../src/components/ui/theme';
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [routine, setRoutine] = useState<any>(null);
@@ -113,7 +113,7 @@ export default function WorkoutScreen() {
           <Text style={styles.exerciseName}>
             {currentExercise?.exercicio_referencia_id.replace(/_/g, ' ')}
           </Text>
-          
+
           <View style={styles.statsRow}>
             <View style={styles.statBox}>
               <Text style={styles.statLabel}>SÉRIES</Text>
@@ -135,15 +135,15 @@ export default function WorkoutScreen() {
         </View>
 
         <View style={styles.timerPlaceholder}>
-            <MaterialCommunityIcons name="timer-outline" size={40} color={colors.grayMid} />
-            <Text style={styles.timerText}>Aguardando descanso...</Text>
-            <Text style={{color: colors.grayMid, fontSize: 12}}>Exercício {currentIndex + 1} de {routine?.exercicios.length}</Text>
+          <MaterialCommunityIcons name="timer-outline" size={40} color={colors.grayMid} />
+          <Text style={styles.timerText}>Aguardando descanso...</Text>
+          <Text style={{ color: colors.grayMid, fontSize: 12 }}>Exercício {currentIndex + 1} de {routine?.exercicios.length}</Text>
         </View>
       </View>
 
       {/* Navegação entre exercícios */}
       <View style={styles.footer}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.navButton, currentIndex === 0 && { opacity: 0.3 }]}
           disabled={currentIndex === 0 || saving}
           onPress={() => setCurrentIndex(prev => prev - 1)}
@@ -151,7 +151,7 @@ export default function WorkoutScreen() {
           <Text style={styles.navButtonText}>Anterior</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.mainButton, saving && { opacity: 0.7 }]}
           disabled={saving}
           onPress={() => {
@@ -178,22 +178,24 @@ export default function WorkoutScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#000' },
   loadingContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    padding: 20, 
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 36,
+    paddingBottom: 12,
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#111'
   },
   headerTitle: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   content: { flex: 1, padding: 20 },
-  exerciseCard: { 
-    backgroundColor: '#111', 
-    borderRadius: 20, 
-    padding: 25, 
-    borderWidth: 1, 
-    borderColor: '#222' 
+  exerciseCard: {
+    backgroundColor: '#111',
+    borderRadius: 20,
+    padding: 25,
+    borderWidth: 1,
+    borderColor: '#222'
   },
   exerciseName: { color: colors.red, fontSize: 24, fontWeight: '900', marginBottom: 20, textAlign: 'center' },
   statsRow: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 20 },
@@ -203,17 +205,17 @@ const styles = StyleSheet.create({
   obsText: { color: colors.grayMid, fontStyle: 'italic', textAlign: 'center', marginTop: 10 },
   timerPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   timerText: { color: colors.grayMid, fontSize: 18, marginTop: 10, marginBottom: 5 },
-  footer: { 
-    flexDirection: 'row', 
-    padding: 20, 
-    borderTopWidth: 1, 
+  footer: {
+    flexDirection: 'row',
+    padding: 20,
+    borderTopWidth: 1,
     borderTopColor: '#111',
     justifyContent: 'space-between'
   },
   navButton: { padding: 15 },
   navButtonText: { color: colors.grayMid, fontWeight: 'bold' },
-  mainButton: { 
-    backgroundColor: colors.red, 
+  mainButton: {
+    backgroundColor: colors.red,
     minWidth: 140,
     height: 50,
     borderRadius: 12,

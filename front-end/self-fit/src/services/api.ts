@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router'; // Import necessário para o redirecionamento
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000', 
+  baseURL: 'http://192.168.0.15:8000',
 });
 
 // 1. Interceptor de REQUISIÇÃO (Já implementado)
@@ -31,9 +31,9 @@ api.interceptors.response.use(
       try {
         // Limpa o token para garantir que a proteção de rotas o barra
         await AsyncStorage.removeItem('token');
-        
+
         // "Chuta" o usuário para a tela de boas-vindas
-        router.replace('/welcome'); 
+        router.replace('/welcome');
       } catch (e) {
         console.error("Erro ao limpar sessão expirada", e);
       }

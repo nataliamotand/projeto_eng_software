@@ -49,6 +49,9 @@ class AlunoMeResponse(BaseModel):
     professor_nome: Optional[str] = None
     class Config: from_attributes = True
 
+class AlunoObjetivoUpdate(BaseModel):
+    objetivo: Optional[str] = None
+
 class ProfessorMeResponse(BaseModel):
     id: int
     cref: Optional[str] = None
