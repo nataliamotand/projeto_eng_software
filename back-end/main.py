@@ -103,7 +103,7 @@ def atualizar_me(dados: schemas.UsuarioPerfilUpdate, email: str = Depends(auth.o
 def criar_perfil_aluno(perfil: schemas.AlunoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if u.perfil_aluno: return u.perfil_aluno
-    db_a = models.Aluno(usuario_id=u.id, objetivo=perfil.objective) # Usando objective do schema
+    db_a = models.Aluno(usuario_id=u.id, objetivo=perfil.objetivo) # Usando objective do schema
     db.add(db_a); db.commit(); db.refresh(db_a); return db_a
 
 @app.post("/fichas", response_model=schemas.FichaTreinoResponse)
@@ -127,15 +127,6 @@ def listar_minhas_rotinas(email: str = Depends(auth.obter_usuario_atual), db: Se
     if not u or not u.perfil_aluno: return []
     return db.query(models.FichaTreino).options(joinedload(models.FichaTreino.exercicios)).filter(models.FichaTreino.aluno_id == u.perfil_aluno.id).order_by(models.FichaTreino.data_criacao.desc()).all()
 
-@app.get("/alunos/me", response_model=schemas.AlunoMeResponse)
-def obter_perfil_aluno(
-    email: str = Depends(auth.obter_usuario_atual),
-    db: Session = Depends(get_db)
-):
-    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    if not u or not u.perfil_aluno:
-        raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
-    return u.perfil_aluno
 
 @app.put("/alunos/me/objetivo", response_model=schemas.AlunoObjetivoRead)
 def atualizar_objetivo(
@@ -153,6 +144,7 @@ def atualizar_objetivo(
 
 # --- 3. EXECUÇÃO, EVOLUÇÃO E HISTÓRICO ---
 
+# --- main.py ---
 @app.post("/alunos/finalizar-treino")
 def finalizar_treino(dados: schemas.TreinoFinalizadoCreate, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
@@ -199,14 +191,24 @@ def listar_historico_treinos(email: str = Depends(auth.obter_usuario_atual), db:
     return db.query(models.TreinoRealizado).options(joinedload(models.TreinoRealizado.exercicios)).filter(models.TreinoRealizado.aluno_id == u.perfil_aluno.id).order_by(models.TreinoRealizado.data_fim.desc()).all()
 
 @app.get("/alunos/me", response_model=schemas.AlunoMeResponse)
-def obter_perfil_aluno(
-    email: str = Depends(auth.obter_usuario_atual),
-    db: Session = Depends(get_db)
-):
+def obter_perfil_aluno(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     if not u or not u.perfil_aluno:
         raise HTTPException(status_code=404, detail="Perfil de aluno não encontrado.")
-    return u.perfil_aluno
+    
+    aluno = u.perfil_aluno
+    nome_prof = None
+    
+    # Lógica de busca: Aluno -> Professor -> Usuário -> Nome
+    if aluno.professor and aluno.professor.usuario:
+        nome_prof = aluno.professor.usuario.nome
+        
+    return {
+        "id": aluno.id,
+        "objetivo": aluno.objetivo,
+        "professor_id": aluno.professor_id,
+        "professor_nome": nome_prof
+    }
 
 # --- 4. SOCIAL E FEED ---
 

@@ -45,6 +45,7 @@ export default function Profile() {
   const [nome, setNome] = useState('');
   const [handle, setHandle] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [professorNome, setProfessorNome] = useState<string | null>(null);
 
   // Stats de aluno
   const [trainingsCount, setTrainingsCount] = useState(0);
@@ -249,7 +250,7 @@ export default function Profile() {
               <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={() => router.push('/previous_workouts')}>
                 <View style={styles.actionLeft}>
                   <MaterialIcons name="fitness-center" size={18} color={colors.white} style={{ marginRight: 12 }} />
-                  <Text style={styles.actionText}>Treinos</Text>
+                  <Text style={styles.actionText}>Histórico</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
               </TouchableOpacity>

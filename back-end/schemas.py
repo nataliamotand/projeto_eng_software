@@ -46,6 +46,7 @@ class AlunoMeResponse(BaseModel):
     id: int
     objetivo: Optional[str] = None
     professor_id: Optional[int] = None
+    professor_nome: Optional[str] = None
     class Config: from_attributes = True
 
 class ProfessorMeResponse(BaseModel):
@@ -160,6 +161,7 @@ class TreinoFinalizadoCreate(BaseModel):
     titulo: str
     duracao_minutos: int
     volume_total: float
+    data_fim: Optional[datetime] = None
     exercicios: List[ExercicioRealizadoBase] 
 
 class TreinoFinalizadoResponse(BaseModel):
