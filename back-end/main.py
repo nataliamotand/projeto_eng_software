@@ -149,24 +149,20 @@ def atualizar_objetivo(
 def finalizar_treino(dados: schemas.TreinoFinalizadoCreate, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     
-    # Lógica: Se vier data no JSON, usa ela. Se não vier, usa o agora (UTC).
-    # Isso permite que você suba treinos retroativos pelo Swagger para testar os gráficos.
-    data_do_treino = getattr(dados, 'data_fim', None) or datetime.utcnow()
+    # Integração: Permite injetar data para testes de gráficos (Natália)
+    data_registro = dados.data_fim or datetime.utcnow()
     
     novo_treino = models.TreinoRealizado(
         aluno_id=u.perfil_aluno.id, 
         titulo=dados.titulo, 
         duracao_minutos=dados.duracao_minutos, 
         volume_total=dados.volume_total, 
-        data_fim=data_do_treino # Garante que o registro no banco SEMPRE tenha data
+        data_fim=data_registro
     )
-    
     db.add(novo_treino)
     db.flush()
-    
     for ex in dados.exercicios:
         db.add(models.ExercicioRealizado(treino_id=novo_treino.id, **ex.dict()))
-    
     db.commit()
     return {"status": "sucesso", "id": novo_treino.id}
 
@@ -330,9 +326,28 @@ def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atu
     aluno.professor_id = None
     db.commit(); return {"status": "vínculo removido"}
 
-@app.get("/professor/aluno/{aluno_id}/historico", response_model=List[schemas.TreinoFinalizadoResponse])
-def ver_historico_aluno_prof(aluno_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
-    return db.query(models.TreinoRealizado).options(joinedload(models.TreinoRealizado.exercicios)).filter(models.TreinoRealizado.aluno_id == aluno_id).order_by(models.TreinoRealizado.data_fim.desc()).all()
+@app.get("/professor/aluno/{aluno_id}/historico")
+def historico_aluno_professor(
+    aluno_id: int, 
+    db: Session = Depends(get_db), 
+    email: str = Depends(auth.obter_usuario_atual)
+):
+    # 1. Verifica se quem está acessando é o professor vinculado
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    aluno = db.query(models.Aluno).filter(
+        models.Aluno.id == aluno_id, 
+        models.Aluno.professor_id == u.perfil_professor.id
+    ).first()
+
+    if not aluno:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para ver o histórico deste aluno.")
+
+    # 2. Busca os treinos concluídos (ajuste o nome da tabela se for diferente no seu models)
+    historico = db.query(models.TreinoRealizado).filter(
+        models.TreinoRealizado.aluno_id == aluno_id
+    ).order_by(models.TreinoRealizado.data_fim.desc()).all()
+
+    return historico
 
 @app.get("/professor/aluno/{aluno_id}/perfil")
 def obter_perfil_aluno_para_professor(aluno_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
@@ -379,3 +394,51 @@ def atualizar_especialidade(
     db.commit()
     db.refresh(u.perfil_professor)
     return u.perfil_professor
+
+@app.get("/professor/aluno/{aluno_id}/medidas")
+def buscar_medidas_aluno(
+    aluno_id: int, 
+    db: Session = Depends(get_db), 
+    email: str = Depends(auth.obter_usuario_atual)
+):
+    # 1. Validação: Quem está pedindo é o professor do aluno?
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    aluno = db.query(models.Aluno).filter(
+        models.Aluno.id == aluno_id, 
+        models.Aluno.professor_id == u.perfil_professor.id
+    ).first()
+
+    if not aluno:
+        raise HTTPException(status_code=403, detail="Acesso não autorizado.")
+
+    # 2. Busca o histórico de evolução
+    evolucoes = db.query(models.Evolucao).filter(
+        models.Evolucao.aluno_id == aluno_id
+    ).order_by(models.Evolucao.data_registro.desc()).all()
+
+    return evolucoes
+
+@app.get("/treinos/detalhes/{treino_id}", response_model=schemas.TreinoFinalizadoResponse)
+def obter_detalhes_treino(treino_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
+    # Correção do 404: Busca detalhes do treino finalizado
+    treino = db.query(models.TreinoRealizado).options(joinedload(models.TreinoRealizado.exercicios)).filter(models.TreinoRealizado.id == treino_id).first()
+    if not treino:
+        raise HTTPException(status_code=404, detail="Treino não encontrado")
+    return treino
+
+@app.get("/professor/aluno/{aluno_id}/metricas-performance")
+def obter_metricas_performance(aluno_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # Valida vínculo
+    aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id, models.Aluno.professor_id == u.perfil_professor.id).first()
+    if not aluno:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+
+    evolucoes = db.query(models.Evolucao).filter(models.Evolucao.aluno_id == aluno_id).order_by(models.Evolucao.data_registro.asc()).all()
+    treinos = db.query(models.TreinoRealizado).filter(models.TreinoRealizado.aluno_id == aluno_id).order_by(models.TreinoRealizado.data_fim.asc()).all()
+
+    return {
+        "composicao_corporal": evolucoes,
+        "volume_treino": [{"data": t.data_fim, "volume": t.volume_total} for t in treinos]
+    }
