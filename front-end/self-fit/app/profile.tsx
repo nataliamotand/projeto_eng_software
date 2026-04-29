@@ -13,7 +13,7 @@ import {
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
@@ -40,41 +40,70 @@ export default function Profile() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [userProfile, setUserProfile] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [nome, setNome] = useState('');
   const [handle, setHandle] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
+  // Stats de aluno
   const [trainingsCount, setTrainingsCount] = useState(0);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
+
+  // Stats de professor
+  const [cref, setCref] = useState<string | null>(null);
+  const [studentsCount, setStudentsCount] = useState(0);
+  const [worksheetsCount, setWorksheetsCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         setLoading(true);
-        const [res, historyRes] = await Promise.all([
+
+        const [meRes, historyRes] = await Promise.all([
           api.get('/usuarios/me'),
-          // Tentamos carregar o histórico, se falhar (ex: professor), ignoramos
-          api.get('/alunos/historico-treinos').catch(() => ({ data: [] }))
+          api.get('/alunos/historico-treinos').catch(() => ({ data: [] })),
         ]);
 
         if (cancelled) return;
-        
-        const { nome: n, tipo_perfil, email, foto_perfil, seguidores_count, seguindo_count, treinos_count } = res.data;
-        
+
+        const {
+          nome: n,
+          tipo_perfil,
+          email,
+          foto_perfil,
+          seguidores_count,
+          seguindo_count,
+          treinos_count,
+        } = meRes.data;
+
+        const perfil = tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT';
+        setUserProfile(perfil);
         setNome(n);
-        setUserProfile(tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT');
         setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
         setAvatarUri(foto_perfil ? String(foto_perfil) : null);
-        setTrainingsCount(treinos_count || 0);
-        setFollowersCount(seguidores_count || 0);
-        setFollowingCount(seguindo_count || 0);
-        setWorkoutHistory(historyRes.data);
 
+        if (perfil === 'STUDENT') {
+          setTrainingsCount(treinos_count || 0);
+          setFollowersCount(seguidores_count || 0);
+          setFollowingCount(seguindo_count || 0);
+          setWorkoutHistory(historyRes.data);
+        } else {
+          const [profRes, alunosRes, fichasRes] = await Promise.all([
+            api.get('/professores/me').catch(() => ({ data: {} })),
+            api.get('/professor/alunos').catch(() => ({ data: [] })),
+            api.get('/professor/minhas-fichas').catch(() => ({ data: [] })),
+          ]);
+
+          if (!cancelled) {
+            setCref(profRes.data?.cref ?? null);
+            setStudentsCount(Array.isArray(alunosRes.data) ? alunosRes.data.length : 0);
+            setWorksheetsCount(Array.isArray(fichasRes.data) ? fichasRes.data.length : 0);
+          }
+        }
       } catch (e) {
         if (!cancelled) setError('Erro ao carregar perfil.');
       } finally {
@@ -87,9 +116,9 @@ export default function Profile() {
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('token');
-      router.replace('/welcome'); 
+      router.replace('/welcome');
     } catch (e) {
-      console.error("Erro ao deslogar:", e);
+      console.error('Erro ao deslogar:', e);
     }
   };
 
@@ -112,20 +141,38 @@ export default function Profile() {
     return (
       <View style={styles.dayWrapper}>
         {workout ? (
-          <View style={styles.dayCircle}><Text style={styles.dayNumber}>{String(date.day)}</Text></View>
+          <View style={styles.dayCircle}>
+            <Text style={styles.dayNumber}>{String(date.day)}</Text>
+          </View>
         ) : (
           <Text style={[styles.dayNumber, { color: colors.white }]}>{String(date.day)}</Text>
         )}
-        {workout && <Text style={styles.dayLabel} numberOfLines={1}>{workout.title}</Text>}
+        {workout && (
+          <Text style={styles.dayLabel} numberOfLines={1}>{workout.title}</Text>
+        )}
       </View>
     );
   }
+
+  const stats = isTeacher
+    ? [
+        { value: cref ?? '—', label: 'Certificado' },
+        { value: String(studentsCount), label: 'Alunos' },
+        { value: String(worksheetsCount), label: 'Fichas' },
+      ]
+    : [
+        { value: String(trainingsCount), label: 'Treinamentos' },
+        { value: String(followersCount), label: 'Seguidores' },
+        { value: String(followingCount), label: 'Seguindo' },
+      ];
 
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Header title="Perfil" />
-        <View style={styles.centered}><ActivityIndicator size="large" color={colors.red} /></View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.red} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -141,31 +188,36 @@ export default function Profile() {
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* CARD DE PERFIL */}
+
         <View style={[styles.profileCard, isTeacher && styles.profileCardTeacher]}>
-          <Image source={avatarUri ? { uri: avatarUri } : defaultAvatar} style={styles.avatarLarge} />
+          <Image
+            source={avatarUri ? { uri: avatarUri } : defaultAvatar}
+            style={styles.avatarLarge}
+          />
           <View style={styles.statsWrap}>
             <Text style={styles.profileName}>{nome || '—'}</Text>
             <Text style={styles.profileHandle}>{handle}</Text>
-            
+
             <View style={styles.statsRow}>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{isTeacher ? '—' : trainingsCount}</Text>
-                <Text style={styles.statLabel}>{isTeacher ? 'Certificado' : 'Treinamentos'}</Text>
-              </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{followersCount}</Text>
-                <Text style={styles.statLabel}>Seguidores</Text>
-              </View>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{followingCount}</Text>
-                <Text style={styles.statLabel}>Seguindo</Text>
-              </View>
+              {stats.map((s, i) => (
+                <View key={i} style={styles.statCol}>
+                  <Text
+                    style={[
+                      styles.statNumber,
+                      isTeacher && i === 0 && styles.statNumberCref,
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {s.value}
+                  </Text>
+                  <Text style={styles.statLabel}>{s.label}</Text>
+                </View>
+              ))}
             </View>
           </View>
         </View>
 
-        {/* CALENDÁRIO (SÓ PARA ALUNOS) */}
         {!isTeacher && (
           <View style={styles.calendarWrap}>
             <Calendar
@@ -183,7 +235,6 @@ export default function Profile() {
           </View>
         )}
 
-        {/* LISTA DE AÇÕES (PARA AMBOS) */}
         <View style={styles.actions}>
           {!isTeacher && (
             <>
@@ -221,7 +272,6 @@ export default function Profile() {
             </>
           )}
 
-          {/* BOTÃO DE SAIR - AGORA FORA DO IF DE ALUNO */}
           <TouchableOpacity style={[styles.actionButton, { marginTop: 12 }]} onPress={handleLogout}>
             <View style={styles.actionLeft}>
               <Ionicons name="log-out-outline" size={18} color={colors.red} style={{ marginRight: 12 }} />
@@ -230,6 +280,7 @@ export default function Profile() {
             <Ionicons name="chevron-forward" size={18} color={colors.lightGray} />
           </TouchableOpacity>
         </View>
+
       </ScrollView>
 
       <StickyFooter active="profile" userProfile={userProfile} />
@@ -237,31 +288,30 @@ export default function Profile() {
   );
 }
 
-// ... (Estilos permanecem os mesmos)
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  settingsWrap: { position: 'absolute', right: 16, top: 64, zIndex: 20 },
-  iconTouch: { marginLeft: 12 },
-  container: { flex: 1 },
-  profileCard: { backgroundColor: colors.background, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 18, flexDirection: 'row', alignItems: 'center' },
+  safeArea:           { flex: 1, backgroundColor: colors.background },
+  centered:           { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  settingsWrap:       { position: 'absolute', right: 16, top: 64, zIndex: 20 },
+  iconTouch:          { marginLeft: 12 },
+  container:          { flex: 1 },
+  profileCard:        { backgroundColor: colors.background, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 18, flexDirection: 'row', alignItems: 'center' },
   profileCardTeacher: { paddingTop: 28, paddingBottom: 28 },
-  avatarLarge: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#222' },
-  statsWrap: { marginLeft: 16, flex: 1, flexDirection: 'column', alignItems: 'flex-start' },
-  profileName: { color: colors.white, fontSize: 18, fontWeight: '800', marginBottom: 6 },
-  profileHandle: { color: colors.grayText, fontSize: 13, marginBottom: 8 },
-  statsRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
-  statCol: { alignItems: 'center', flex: 1 },
-  statNumber: { color: colors.white, fontSize: 18, fontWeight: '700' },
-  statLabel: { color: colors.grayText, fontSize: 12, marginTop: 4 },
-  calendarWrap: { paddingHorizontal: 12, paddingTop: 18 },
-  dayWrapper: { alignItems: 'center', width: 40 },
-  dayCircle: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
-  dayNumber: { color: colors.white, fontSize: 14 },
-  dayLabel: { color: colors.lightGray, fontSize: 10, marginTop: 4, textAlign: 'center' },
-  actions: { paddingHorizontal: 16, paddingTop: 32 },
-  actionButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkGray, padding: 14, borderRadius: 12, justifyContent: 'space-between' },
-  actionLeft: { flexDirection: 'row', alignItems: 'center' },
-  actionText: { color: colors.white, fontSize: 16, fontWeight: '700' },
+  avatarLarge:        { width: 96, height: 96, borderRadius: 48, backgroundColor: '#222' },
+  statsWrap:          { marginLeft: 16, flex: 1, flexDirection: 'column', alignItems: 'flex-start' },
+  profileName:        { color: colors.white, fontSize: 18, fontWeight: '800', marginBottom: 6 },
+  profileHandle:      { color: colors.grayText, fontSize: 13, marginBottom: 8 },
+  statsRow:           { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
+  statCol:            { alignItems: 'center', flex: 1 },
+  statNumber:         { color: colors.white, fontSize: 18, fontWeight: '700' },
+  statNumberCref:     { fontSize: 13, fontWeight: '700' },
+  statLabel:          { color: colors.grayText, fontSize: 12, marginTop: 4 },
+  calendarWrap:       { paddingHorizontal: 12, paddingTop: 18 },
+  dayWrapper:         { alignItems: 'center', width: 40 },
+  dayCircle:          { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.red, alignItems: 'center', justifyContent: 'center' },
+  dayNumber:          { color: colors.white, fontSize: 14 },
+  dayLabel:           { color: colors.lightGray, fontSize: 10, marginTop: 4, textAlign: 'center' },
+  actions:            { paddingHorizontal: 16, paddingTop: 32 },
+  actionButton:       { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.darkGray, padding: 14, borderRadius: 12, justifyContent: 'space-between' },
+  actionLeft:         { flexDirection: 'row', alignItems: 'center' },
+  actionText:         { color: colors.white, fontSize: 16, fontWeight: '700' },
 });
