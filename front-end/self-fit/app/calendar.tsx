@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   SafeAreaView,
   View,
@@ -7,12 +7,14 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
+import api from '@/src/services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -35,8 +37,8 @@ const mockedWorkouts = [
   { date: '2026-12-24', title: 'Core' },
 ];
 
-const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const monthShorts = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const monthShorts = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
 
 function buildMap(list: { date: string; title?: string }[]) {
   const m: Record<string, { date: string; title?: string }> = {};
@@ -44,10 +46,10 @@ function buildMap(list: { date: string; title?: string }[]) {
   return m;
 }
 
-function MonthView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
+function MonthView({ workoutMap }: { workoutMap: Record<string, any> }) {
   function renderDay({ date }: any) {
     const ds = date.dateString;
-    const w = workoutsMap[ds];
+    const w = workoutMap[ds];
 
     return (
       <View style={styles.dayWrapper}>
@@ -81,7 +83,7 @@ function MonthView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
   );
 }
 
-function YearView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
+function YearView({ workoutMap }: { workoutMap: Record<string, any> }) {
   // render 12 months each with mini grid
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -101,7 +103,7 @@ function YearView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
             const dayIndex = idx - firstDay + 1;
             if (dayIndex < 1 || dayIndex > days) return null;
             const ds = `2026-${String(m).padStart(2, '0')}-${String(dayIndex).padStart(2, '0')}`;
-            return { day: dayIndex, has: !!workoutsMap[ds] };
+            return { day: dayIndex, has: !!workoutMap[ds] };
           });
 
           return (
@@ -126,14 +128,14 @@ function YearView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
   );
 }
 
-function MultiYearView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
+function MultiYearView({ workoutMap }: { workoutMap: Record<string, any> }) {
   // build weeks for the year 2026 (columns)
   const start = new Date(2026, 0, 1);
   const end = new Date(2026, 11, 31);
   const days: { date: string; has: boolean }[] = [];
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const ds = d.toISOString().slice(0, 10);
-    days.push({ date: ds, has: !!workoutsMap[ds] });
+    days.push({ date: ds, has: !!workoutMap[ds] });
   }
 
   // group by week columns (Sunday-start)
@@ -216,12 +218,61 @@ function MultiYearView({ workoutsMap }: { workoutsMap: Record<string, any> }) {
   );
 }
 
-export default function CalendarScreen(): JSX.Element {
+export default function CalendarScreen() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'month' | 'year' | 'multi-year'>('month');
   const [showModeMenu, setShowModeMenu] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
 
-  const workoutsMap = useMemo(() => buildMap(mockedWorkouts), []);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+
+        const historyRes = await api.get('/alunos/historico-treinos')
+        if (cancelled) return;
+
+        setWorkoutHistory(historyRes.data);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // Memoização do calendário para performance (mapeia treinos reais)
+  const workoutMap = useMemo(() => {
+    const m: Record<string, { date: string; title: string }> = {};
+    workoutHistory.forEach((w) => {
+      const dateKey = new Date(w.data_fim).toISOString().split('T')[0];
+      m[dateKey] = { date: dateKey, title: w.titulo };
+    });
+    return m;
+  }, [workoutHistory]);
+
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
+            <Ionicons name="arrow-back" size={22} color={colors.white} />
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => setShowModeMenu(true)} style={styles.modeButton}>
+            <Text style={styles.modeText}>{viewMode === 'month' ? 'Mês' : viewMode === 'year' ? 'Ano' : 'Plurianual'}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.white} style={{ marginLeft: 6 }} />
+          </TouchableOpacity>
+        </View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={colors.red} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -250,15 +301,6 @@ export default function CalendarScreen(): JSX.Element {
             </View>
           </TouchableOpacity>
         )}
-
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => { /* TODO: share */ }} style={styles.iconTouch}>
-            <Ionicons name="share-social" size={20} color={colors.white} />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => { /* TODO: filter */ }} style={styles.iconTouch}>
-            <Ionicons name="options" size={20} color={colors.white} />
-          </TouchableOpacity>
-        </View>
       </View>
 
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 80 }}>
@@ -271,13 +313,13 @@ export default function CalendarScreen(): JSX.Element {
               </View>
             </View>
 
-            <MonthView workoutsMap={workoutsMap} />
+            <MonthView workoutMap={workoutMap} />
           </View>
         )}
 
-        {viewMode === 'year' && <YearView workoutsMap={workoutsMap} />}
+        {viewMode === 'year' && <YearView workoutMap={workoutMap} />}
 
-        {viewMode === 'multi-year' && <MultiYearView workoutsMap={workoutsMap} />}
+        {viewMode === 'multi-year' && <MultiYearView workoutMap={workoutMap} />}
       </ScrollView>
 
       <StickyFooter active="workouts" />
@@ -289,6 +331,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 48, paddingBottom: 12 },
   headerLeft: { width: 40 },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   modeButton: { flexDirection: 'row', alignItems: 'center' },
   modeText: { color: colors.white, fontWeight: '700', fontSize: 16 },
   headerRight: { flexDirection: 'row', alignItems: 'center' },

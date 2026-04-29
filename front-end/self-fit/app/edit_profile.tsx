@@ -228,6 +228,12 @@ export default function EditProfile() {
     }
   }
 
+
+
+
+
+
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
@@ -274,8 +280,11 @@ export default function EditProfile() {
                 typeof avatarUri === 'number'
                   ? avatarUri
                   : avatarUri
-                  ? { uri: String(avatarUri) }
-                  : require('../assets/images/logo.png')
+
+                    ? { uri: String(avatarUri) }
+
+                    : require('../assets/images/logo.png')
+
               }
               style={styles.avatarLarge}
             />

@@ -22,10 +22,10 @@ import api from '../src/services/api';
 const { width } = Dimensions.get('window');
 
 LocaleConfig.locales['pt'] = {
-  monthNames: ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'],
-  monthNamesShort: ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'],
-  dayNames: ['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'],
-  dayNamesShort: ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],
+  monthNames: ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'],
+  monthNamesShort: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'],
+  dayNames: ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'],
+  dayNamesShort: ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'],
   today: 'Hoje'
 };
 LocaleConfig.defaultLocale = 'pt';
@@ -63,8 +63,9 @@ export default function Profile() {
     (async () => {
       try {
         setLoading(true);
+        setError(null);
 
-        const [meRes, historyRes] = await Promise.all([
+        const [res, historyRes] = await Promise.all([
           api.get('/usuarios/me'),
           api.get('/alunos/historico-treinos').catch(() => ({ data: [] })),
         ]);
@@ -78,11 +79,9 @@ export default function Profile() {
           foto_perfil,
           seguidores_count,
           seguindo_count,
-          treinos_count,
-        } = meRes.data;
+          treinos_count // Novo campo linkado
+        } = res.data;
 
-        const perfil = tipo_perfil === 'TEACHER' ? 'TEACHER' : 'STUDENT';
-        setUserProfile(perfil);
         setNome(n);
         setHandle(`@${buildHandle(n || email?.split('@')[0] || 'usuario')}`);
         setAvatarUri(foto_perfil ? String(foto_perfil) : null);
@@ -170,7 +169,14 @@ export default function Profile() {
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <Header title="Perfil" />
+        <Header
+          title="Perfil"
+          right={
+            <TouchableOpacity onPress={() => { router.push('/edit_profile'); }}>
+              <Ionicons name="settings-outline" size={22} color={colors.white} />
+            </TouchableOpacity>
+          }
+        />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.red} />
         </View>
@@ -180,7 +186,14 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header title="Perfil" />
+      <Header
+        title="Perfil"
+        right={
+          <TouchableOpacity onPress={() => { router.push('/edit_profile'); }}>
+            <Ionicons name="settings-outline" size={22} color={colors.white} />
+          </TouchableOpacity>
+        }
+      />
 
       <View style={styles.settingsWrap}>
         <TouchableOpacity onPress={() => router.push('/edit_profile')} style={styles.iconTouch}>
@@ -290,12 +303,12 @@ export default function Profile() {
 }
 
 const styles = StyleSheet.create({
-  safeArea:           { flex: 1, backgroundColor: colors.background },
-  centered:           { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  iconTouch: { marginLeft: 12 },
+  container: { flex: 1 },
+  profileCard: { backgroundColor: colors.background, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 18, flexDirection: 'row', alignItems: 'center' },
   settingsWrap:       { position: 'absolute', right: 16, top: 64, zIndex: 20 },
-  iconTouch:          { marginLeft: 12 },
-  container:          { flex: 1 },
-  profileCard:        { backgroundColor: colors.background, paddingTop: 48, paddingHorizontal: 16, paddingBottom: 18, flexDirection: 'row', alignItems: 'center' },
   profileCardTeacher: { paddingTop: 28, paddingBottom: 28 },
   avatarLarge:        { width: 96, height: 96, borderRadius: 48, backgroundColor: '#222' },
   statsWrap:          { marginLeft: 16, flex: 1, flexDirection: 'column', alignItems: 'flex-start' },

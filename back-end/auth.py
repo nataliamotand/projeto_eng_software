@@ -1,6 +1,7 @@
 import bcrypt
 from datetime import datetime, timedelta
 from jose import jwt
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional
@@ -13,25 +14,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7 # O crachá dura 7 dias
 # Diz pro FastAPI que a rota de pegar o crachá é a "/login"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
-def gerar_hash_senha(senha: str) -> str:
-    """Transforma a senha pura num texto ilegível usando bcrypt puro"""
-    # Transforma a string em bytes para o bcrypt processar
-    senha_bytes = senha.encode('utf-8')
-    # Gera o tempero (salt) e cria o hash
-    salt = bcrypt.gensalt()
-    hash_bytes = bcrypt.hashpw(senha_bytes, salt)
-    # Retorna como string para salvar no banco de dados
-    return hash_bytes.decode('utf-8')
+def gerar_hash_senha(senha: str):
+    """Transforma a senha pura num texto ilegível"""
+    return bcrypt.hashpw(senha.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
-def verificar_senha(senha_pura: str, senha_hash: str) -> bool:
-    """Compara a senha digitada com a do banco com segurança"""
-    try:
-        return bcrypt.checkpw(
-            senha_pura.encode('utf-8'), 
-            senha_hash.encode('utf-8')
-        )
-    except Exception:
-        return False
+def verificar_senha(senha_pura: str, senha_hash: str):
+    """Compara a senha digitada com a do banco"""
+    return bcrypt.checkpw(senha_pura.encode('utf-8'), senha_hash.encode('utf-8'))
 
 def criar_token_acesso(dados: dict):
     """Gera o Token JWT de acesso"""
