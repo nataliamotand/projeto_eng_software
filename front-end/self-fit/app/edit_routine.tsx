@@ -44,10 +44,28 @@ export default function EditRoutine() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuTargetId, setMenuTargetId] = useState<string | number | null>(null);
 
+  // Cache key único por rotina para não conflitar com create_routine
+  const cacheKey = `__EDIT_ROUTINE_EXERCISES_${id}`;
+
   // 1. CARREGAR DADOS EXISTENTES (HIDRATAÇÃO)
   useEffect(() => {
-    if (id) loadRoutineData();
+    if (!id) return;
+    // Se já temos dados em cache (voltando de choose_exercise), usa o cache
+    const cached = (globalThis as any)[cacheKey];
+    if (Array.isArray(cached) && cached.length > 0) {
+      setSelectedExercises(cached);
+      setLoading(false);
+    } else {
+      loadRoutineData();
+    }
   }, [id]);
+
+  // Persiste exercícios no cache global toda vez que mudam
+  useEffect(() => {
+    if (!loading) {
+      (globalThis as any)[cacheKey] = selectedExercises;
+    }
+  }, [selectedExercises, loading]);
 
   async function loadRoutineData() {
     try {
@@ -58,10 +76,11 @@ export default function EditRoutine() {
       setRoutineTitle(data.titulo);
       
       // Mapeia os exercícios do banco para o formato do estado do Front-end
+      // Usa o nome traduzido do JSON local se disponível, senão formata o ID
       const mappedExercises = data.exercicios.map((ex: any) => ({
-        id: ex.exercicio_referencia_id, // Ex: "3_4_Sit-Up"
-        name: ex.exercicio_referencia_id.replace(/_/g, ' '),
-        target: '', // Opcional: buscar na API de exercícios se necessário
+        id: ex.exercicio_referencia_id,
+        name: ex.nome_exercicio || ex.exercicio_referencia_id.replace(/_/g, ' '),
+        target: ex.musculo || '',
         notes: ex.observacao || '',
         series: ex.series,
         weight: String(ex.carga),
@@ -78,7 +97,7 @@ export default function EditRoutine() {
     }
   }
 
-  // 2. CAPTURAR NOVOS EXERCÍCIOS (Caso o usuário adicione mais na edição)
+  // 2. CAPTURAR NOVOS EXERCÍCIOS ao voltar de choose_exercise
   useFocusEffect(
     useCallback(() => {
       const added = (globalThis as any).__PENDING_SELECTED_EXERCISES;
@@ -95,7 +114,9 @@ export default function EditRoutine() {
 
         setSelectedExercises(prev => {
           const existingIds = new Set(prev.map(e => String(e.id)));
-          return [...prev, ...toAdd.filter(ex => !existingIds.has(String(ex.id)))];
+          const merged = [...prev, ...toAdd.filter(ex => !existingIds.has(String(ex.id)))];
+          (globalThis as any)[cacheKey] = merged; // Atualiza cache imediatamente
+          return merged;
         });
         delete (globalThis as any).__PENDING_SELECTED_EXERCISES;
       }
@@ -120,6 +141,9 @@ export default function EditRoutine() {
       };
 
       await api.put(`/fichas/${id}`, payload);
+
+      // Limpa o cache ao salvar com sucesso
+      delete (globalThis as any)[cacheKey];
 
       Alert.alert("Sucesso", "Rotina atualizada com sucesso!", [
         { text: "OK", onPress: () => router.replace('/routines_and_workouts') }

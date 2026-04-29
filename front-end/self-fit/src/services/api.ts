@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router'; // Import necessário para o redirecionamento
 
 const api = axios.create({
-  baseURL: 'http://192.168.15.9:8000',
+  baseURL: 'http://localhost:8000',
 });
 
 // 1. Interceptor de REQUISIÇÃO (Já implementado)
