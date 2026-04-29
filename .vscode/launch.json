@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Backend (FastAPI)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/back-end/.venv/bin/uvicorn",
+            "args": [
+                "main:app",
+                "--reload"
+            ],
+            "cwd": "${workspaceFolder}/back-end",
+            "jinja": true,
+            "justMyCode": true
+        }
+    ]
+}

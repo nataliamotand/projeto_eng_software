@@ -99,7 +99,7 @@ export default function ChooseExercise() {
     }
   };
 
-  function ExerciseItem({ item }: { item: Exercise }) {
+  const renderExerciseItem = useCallback(({ item }: { item: Exercise }) => {
     const id = item.id ?? item.name;
     const isSelected = selectedExercises.includes(id as string | number);
     const targetLabel = item.target || item.muscle ? displayMuscleLabel(item.target || item.muscle) : '';
@@ -131,7 +131,7 @@ export default function ChooseExercise() {
         </View>
       </TouchableOpacity>
     );
-  }
+  }, [selectedExercises, toggleSelect]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -184,7 +184,7 @@ export default function ChooseExercise() {
           <FlatList
             data={data}
             keyExtractor={(it, idx) => String(it.id ?? idx)}
-            renderItem={({ item }) => <ExerciseItem item={item} />}
+            renderItem={renderExerciseItem}
             contentContainerStyle={{ paddingBottom: 120 }}
             ItemSeparatorComponent={() => <View style={styles.separator} />}
             onEndReached={() => hasMore && loadMore()}

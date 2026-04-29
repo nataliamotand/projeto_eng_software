@@ -74,7 +74,6 @@ export default function RootLayout() {
     <ThemeProvider value={CustomDarkTheme}>
       <View style={{ flex: 1, backgroundColor: '#000' }}> 
         <Animated.View 
-          key={segments.join('-')} 
           entering={FadeInDown.duration(200)} 
           style={{ flex: 1 }}
         >
