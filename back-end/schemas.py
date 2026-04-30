@@ -14,9 +14,9 @@ class UsuarioResponse(BaseModel):
     id: int
     nome: str
     email: str
+    username: Optional[str] = None
     tipo_perfil: str
     foto_perfil: Optional[str] = None
-    # ALTERADO: Campos de contagem para linkagem social e treinos
     seguidores_count: int = 0
     seguindo_count: int = 0
     treinos_count: int = 0

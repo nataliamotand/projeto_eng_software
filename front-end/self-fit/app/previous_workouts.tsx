@@ -7,7 +7,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter, useLocalSearchParams } from 'expo-router'; // Adicionado useLocalSearchParams
 import Header from '../src/components/ui/Header';
-import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api';
 
@@ -72,7 +71,7 @@ export default function PreviousWorkouts() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <Header title={studentId ? "Histórico do Aluno" : "Meus Treinos"} />
+      <Header title={studentId ? "Histórico do Aluno" : "Meus Treinos"} onBack={() => router.replace('/profile')} />
 
       <FlatList
         data={workouts}
@@ -140,7 +139,6 @@ export default function PreviousWorkouts() {
         </TouchableOpacity>
       </Modal>
 
-      <StickyFooter active="workouts" userProfile={user?.tipo_perfil} />
     </SafeAreaView>
   );
 }
@@ -150,7 +148,7 @@ export default function PreviousWorkouts() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   loadingArea: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' },
-  listContent: { padding: 16, paddingBottom: 100 },
+  listContent: { padding: 16, paddingBottom: 24 },
   card: {
     backgroundColor: colors.darkGray,
     padding: 16,

@@ -4,12 +4,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { colors } from './theme';
 
-export default function Header({ title, right }: { title?: string; right?: React.ReactNode }) {
+export default function Header({ title, right, onBack }: { title?: string; right?: React.ReactNode; onBack?: () => void }) {
   const router = useRouter();
 
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
+      <TouchableOpacity onPress={onBack ?? (() => router.back())} style={styles.headerLeft}>
         <Ionicons name="arrow-back" size={24} color={colors.white} />
       </TouchableOpacity>
 
