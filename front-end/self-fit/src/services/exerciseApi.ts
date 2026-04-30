@@ -121,3 +121,21 @@ export async function getAllTargetMuscles(): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * Retorna um mapa de { id -> name } lido diretamente do JSON local.
+ * Usar este mapa garante que o nome esteja no idioma correto do JSON.
+ */
+export async function buildNameMap(): Promise<Record<string, string>> {
+  try {
+    const all = await loadFallback();
+    const map: Record<string, string> = {};
+    for (const ex of all) {
+      if (ex.id && ex.name) map[String(ex.id)] = String(ex.name);
+    }
+    return map;
+  } catch (err) {
+    console.error('exerciseApi.buildNameMap error', err);
+    return {};
+  }
+}

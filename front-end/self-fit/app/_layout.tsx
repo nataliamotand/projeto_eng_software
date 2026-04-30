@@ -60,7 +60,7 @@ export default function RootLayout() {
     };
 
     checkAuth();
-  }, [segments, fontsLoaded]);
+  }, [fontsLoaded]);
 
   if (!fontsLoaded || !isReady) {
     return (

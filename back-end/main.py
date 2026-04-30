@@ -123,17 +123,65 @@ def criar_perfil_aluno(perfil: schemas.AlunoCreate, email: str = Depends(auth.ob
 @app.post("/fichas", response_model=schemas.FichaTreinoResponse)
 def criar_ficha(ficha_dados: schemas.FichaTreinoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    nova_ficha = models.FichaTreino(aluno_id=u.perfil_aluno.id, titulo=ficha_dados.titulo, criado_por_professor=(u.tipo_perfil == "TEACHER"))
+
+    if u.tipo_perfil == "TEACHER":
+        # Professor criando rotina: precisa informar o aluno_id
+        if not ficha_dados.aluno_id:
+            raise HTTPException(status_code=400, detail="Professor deve informar o aluno_id ao criar uma rotina.")
+        aluno = db.query(models.Aluno).filter(models.Aluno.id == ficha_dados.aluno_id).first()
+        if not aluno:
+            raise HTTPException(status_code=404, detail="Aluno não encontrado.")
+        aluno_id = ficha_dados.aluno_id
+    else:
+        # Aluno criando sua própria rotina
+        if not u.perfil_aluno:
+            raise HTTPException(status_code=400, detail="Usuário não possui perfil de aluno.")
+        aluno_id = u.perfil_aluno.id
+
+    nova_ficha = models.FichaTreino(aluno_id=aluno_id, titulo=ficha_dados.titulo, criado_por_professor=(u.tipo_perfil == "TEACHER"))
     db.add(nova_ficha); db.flush()
     for ex in ficha_dados.exercicios:
         db.add(models.ItemExercicio(ficha_id=nova_ficha.id, **ex.dict()))
     db.commit(); db.refresh(nova_ficha); return nova_ficha
+
+@app.delete("/fichas/{ficha_id}")
+def deletar_ficha(ficha_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    ficha = db.query(models.FichaTreino).filter(models.FichaTreino.id == ficha_id).first()
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada.")
+    if not u.perfil_aluno or ficha.aluno_id != u.perfil_aluno.id:
+        raise HTTPException(status_code=403, detail="Sem permissão para excluir esta ficha.")
+    db.query(models.ItemExercicio).filter(models.ItemExercicio.ficha_id == ficha_id).delete()
+    db.delete(ficha)
+    db.commit()
+    return {"status": "excluído"}
+
+
+@app.put("/fichas/{ficha_id}", response_model=schemas.FichaTreinoResponse)
+def atualizar_ficha(ficha_id: int, dados: schemas.FichaTreinoCreate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    ficha = db.query(models.FichaTreino).filter(models.FichaTreino.id == ficha_id).first()
+    if not ficha:
+        raise HTTPException(status_code=404, detail="Ficha não encontrada.")
+    if not u.perfil_aluno or ficha.aluno_id != u.perfil_aluno.id:
+        raise HTTPException(status_code=403, detail="Sem permissão para editar esta ficha.")
+    # Atualiza título
+    ficha.titulo = dados.titulo
+    # Substitui todos os exercícios
+    db.query(models.ItemExercicio).filter(models.ItemExercicio.ficha_id == ficha_id).delete()
+    for ex in dados.exercicios:
+        db.add(models.ItemExercicio(ficha_id=ficha_id, **ex.dict()))
+    db.commit()
+    db.refresh(ficha)
+    return ficha
 
 @app.get("/fichas/{ficha_id}", response_model=schemas.FichaTreinoResponse)
 def obter_detalhes_ficha(ficha_id: int, db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
     ficha = db.query(models.FichaTreino).options(joinedload(models.FichaTreino.exercicios)).filter(models.FichaTreino.id == ficha_id).first()
     if not ficha: raise HTTPException(status_code=404, detail="Rotina não encontrada.")
     return ficha
+
 
 @app.get("/alunos/minhas-rotinas", response_model=List[schemas.FichaTreinoResponse])
 def listar_minhas_rotinas(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
@@ -353,7 +401,7 @@ def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atu
     aluno.professor_id = None
     db.commit(); return {"status": "vínculo removido"}
 
-@app.get("/professor/aluno/{aluno_id}/historico")
+@app.get("/professor/aluno/{aluno_id}/historico", response_model=List[schemas.TreinoFinalizadoResponse])
 def historico_aluno_professor(
     aluno_id: int, 
     db: Session = Depends(get_db), 
@@ -369,8 +417,8 @@ def historico_aluno_professor(
     if not aluno:
         raise HTTPException(status_code=403, detail="Você não tem permissão para ver o histórico deste aluno.")
 
-    # 2. Busca os treinos concluídos (ajuste o nome da tabela se for diferente no seu models)
-    historico = db.query(models.TreinoRealizado).filter(
+    # 2. Busca os treinos concluídos com os exercícios
+    historico = db.query(models.TreinoRealizado).options(joinedload(models.TreinoRealizado.exercicios)).filter(
         models.TreinoRealizado.aluno_id == aluno_id
     ).order_by(models.TreinoRealizado.data_fim.desc()).all()
 

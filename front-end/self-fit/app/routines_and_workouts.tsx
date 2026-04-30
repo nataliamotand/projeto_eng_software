@@ -121,23 +121,22 @@ export default function RoutinesAndWorkouts() {
     const performDelete = async () => {
       try {
         setLoading(true);
+        setOpenMenuId(null);
         console.log(`📡 Enviando DELETE para /fichas/${id}...`);
         await api.delete(`/fichas/${id}`);
-
         setRoutines((prev) => prev.filter((r) => r.id !== id));
-        setOpenMenuId(null);
         console.log("✅ Deletado com sucesso!");
       } catch (err) {
         console.error("❌ Erro ao deletar:", err);
+        Alert.alert("Erro", "Não foi possível excluir a rotina.");
       } finally {
         setLoading(false);
       }
     };
 
-    // Se for WEB, usa o confirm do navegador. Se for MOBILE, usa o Alert.alert
     if (Platform.OS === "web") {
       if (window.confirm("Tem certeza que deseja apagar este treino?")) {
-        await performDelete();
+        performDelete();
       }
     } else {
       Alert.alert(
