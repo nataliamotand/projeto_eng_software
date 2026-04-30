@@ -29,44 +29,47 @@ export default function Login(){
   const [login, setLogin] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [visible, setVisible] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
   // --- LÓGICA DE GOVERNANÇA: A PONTE COM O BACKEND ---
   const handleLogin = async () => {
-    if (!login || !password) {
-      setError('Por favor, preencha login e senha.');
+    if (!login.trim()) {
+      setFeedback({ type: 'error', message: 'Informe seu e-mail para continuar.' });
+      return;
+    }
+    if (!password) {
+      setFeedback({ type: 'error', message: 'Informe sua senha para continuar.' });
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setFeedback(null);
 
     try {
-      // O FastAPI exige os dados em formato de formulário (x-www-form-urlencoded)
       const params = new URLSearchParams();
-      params.append('username', login);
+      params.append('username', login.trim());
       params.append('password', password);
 
       const response = await api.post('/login', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       });
 
-      // Sucesso: Guardamos o crachá (token)
       const token = response.data.access_token;
       await AsyncStorage.setItem('token', token);
 
-      console.log('Login realizado com sucesso!');
-      router.replace('/home'); // Navega para a Home real
+      setFeedback({ type: 'success', message: 'Login realizado! Redirecionando...' });
+      setTimeout(() => router.replace('/home'), 1200);
 
     } catch (err: any) {
-      if (err.response && err.response.status === 401) {
-        setError('Login ou senha inválidos.');
+      if (err.response?.status === 401) {
+        setFeedback({ type: 'error', message: 'E-mail ou senha incorretos. Verifique e tente novamente.' });
+      } else if (err.response?.status === 404) {
+        setFeedback({ type: 'error', message: 'E-mail não encontrado. Verifique ou crie uma conta.' });
+      } else if (!err.response) {
+        setFeedback({ type: 'error', message: 'Sem conexão com o servidor. Verifique sua internet.' });
       } else {
-        setError('Erro de conexão com o servidor.');
-        console.error("Erro de login:", err);
+        setFeedback({ type: 'error', message: 'Ocorreu um erro inesperado. Tente novamente.' });
       }
     } finally {
       setLoading(false);
@@ -104,16 +107,17 @@ export default function Login(){
             <Text style={styles.title}>LOGIN</Text>
 
             <View style={styles.inputWrapper}>
-              {/* Campo Login/Email */}
+              {/* Campo E-mail */}
               <View style={styles.inputRow}>
-                <Ionicons name="person" size={20} color="#333" style={styles.leftIcon} />
+                <Ionicons name="mail" size={20} color="#333" style={styles.leftIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Login"
+                  placeholder="E-mail"
                   placeholderTextColor="#666"
                   value={login}
                   onChangeText={setLogin}
                   autoCapitalize="none"
+                  keyboardType="email-address"
                   editable={!loading}
                 />
               </View>
@@ -139,8 +143,18 @@ export default function Login(){
               </View>
             </View>
 
-            {/* Mensagem de Erro (Estilizada) */}
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {/* Banner de Feedback */}
+            {feedback && (
+              <View style={[styles.feedbackBanner, feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError]}>
+                <Ionicons
+                  name={feedback.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                  size={18}
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles.feedbackText}>{feedback.message}</Text>
+              </View>
+            )}
 
             {/* Botão Entrar com Feedback de Carregamento */}
             <TouchableOpacity
@@ -245,11 +259,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Anton',
     fontSize: 16,
   },
-  errorText: { 
-    color: '#FF6666', 
-    marginTop: 12, 
-    fontSize: 14, 
-    fontWeight: 'bold' 
+  feedbackBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+  },
+  feedbackError: {
+    backgroundColor: 'rgba(220,38,38,0.15)',
+    borderLeftColor: '#dc2626',
+  },
+  feedbackSuccess: {
+    backgroundColor: 'rgba(22,163,74,0.15)',
+    borderLeftColor: '#16a34a',
+  },
+  feedbackText: {
+    flex: 1,
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
   footer: {
     alignItems: 'center',

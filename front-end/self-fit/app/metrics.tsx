@@ -6,7 +6,6 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import Header from '../src/components/ui/Header';
-import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import { BarChart, LineChart } from 'react-native-chart-kit';
 import api from '../src/services/api';
@@ -101,7 +100,7 @@ export default function Metrics() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title={studentId ? "Métricas do Aluno" : "Minha Performance"} />
+      <Header title={studentId ? "Métricas do Aluno" : "Minha Performance"} onBack={() => router.replace('/profile')} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.section}>
@@ -161,7 +160,6 @@ export default function Metrics() {
           )}
         </View>
       </ScrollView>
-      <StickyFooter active="workouts" userProfile={userRole} />
     </SafeAreaView>
   );
 }
@@ -169,7 +167,7 @@ export default function Metrics() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
-  scrollContent: { padding: 16, paddingBottom: 100 },
+  scrollContent: { padding: 16, paddingBottom: 24 },
   section: { marginBottom: 30 },
   sectionTitle: { color: colors.white, fontSize: 16, fontWeight: '700', marginBottom: 12 },
   chart: { borderRadius: 12 },

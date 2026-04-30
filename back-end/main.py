@@ -22,6 +22,18 @@ with engine.begin() as conn:
     conn.execute(text("ALTER TABLE itens_exercicio ALTER COLUMN exercicio_referencia_id TYPE VARCHAR USING exercicio_referencia_id::varchar"))
 
     conn.execute(text("ALTER TABLE professores ADD COLUMN IF NOT EXISTS especialidade VARCHAR"))
+    conn.execute(text("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS username VARCHAR"))
+    # Cria índice único para username apenas se não existir
+    conn.execute(text("""
+        DO $$ BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_indexes 
+                WHERE tablename='usuarios' AND indexname='ix_usuarios_username'
+            ) THEN
+                CREATE UNIQUE INDEX ix_usuarios_username ON usuarios(username) WHERE username IS NOT NULL;
+            END IF;
+        END $$;
+    """))
 
 app = FastAPI(title="API Self-Fit - Sistema Total Integrado")
 
@@ -53,7 +65,8 @@ def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_
     if db.query(models.Usuario).filter(models.Usuario.email == usuario.email).first():
         raise HTTPException(status_code=400, detail="Email já cadastrado.")
     db_usuario = models.Usuario(
-        nome=usuario.nome, email=usuario.email, senha=auth.gerar_hash_senha(usuario.senha),
+        nome=usuario.nome, email=usuario.email,
+        senha=auth.gerar_hash_senha(usuario.senha),
         data_nascimento=usuario.data_nascimento, tipo_perfil=usuario.tipo_perfil
     )
     db.add(db_usuario)
@@ -65,19 +78,17 @@ def cadastrar_usuario(usuario: schemas.UsuarioCreate, db: Session = Depends(get_
         perfil = models.Aluno(usuario_id=db_usuario.id, objetivo="")
         db.add(perfil)
         db.commit()
-    elif usuario.tipo_perfil == "TEACHER":
-        perfil = models.Professor(usuario_id=db_usuario.id, cref="")
-        db.add(perfil)
-        db.commit()
+    # Professor: o perfil é criado em POST /professores com o CREF real
         
     db.refresh(db_usuario)
     return db_usuario
 
 @app.post("/login")
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    # Busca o usuário pelo email
     u = db.query(models.Usuario).filter(models.Usuario.email == form_data.username).first()
     if not u or not auth.verificar_senha(form_data.password, u.senha):
-        raise HTTPException(status_code=401, detail="Credenciais inválidas")
+        raise HTTPException(status_code=401, detail="E-mail ou senha incorretos.")
     return {"access_token": auth.criar_token_acesso({"sub": u.email, "perfil": u.tipo_perfil}), "token_type": "bearer"}
 
 @app.get("/usuarios/me", response_model=schemas.UsuarioResponse)
@@ -156,20 +167,6 @@ def atualizar_objetivo(
     db.refresh(u.perfil_aluno)
     return u.perfil_aluno
 
-@app.get("/alunos/me")
-def ler_aluno_me(db: Session = Depends(get_db), email: str = Depends(auth.obter_usuario_atual)):
-    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    aluno = db.query(models.Aluno).filter(models.Aluno.usuario_id == u.id).first()
-    if not aluno: raise HTTPException(status_code=404, detail="Objetivo não encontrado.")
-    return aluno
-
-@app.put("/alunos/me/objetivo")
-def atualizar_aluno_me(dados: schemas.AlunoObjetivoUpdate, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
-    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    aluno = db.query(models.Aluno).filter(models.Aluno.usuario_id == u.id).first()
-    if dados.objetivo is not None:
-        aluno.objetivo = dados.objetivo
-    db.commit(); db.refresh(aluno); return aluno
 
 # --- 3. EXECUÇÃO E HISTÓRICO DE TREINOS ---
 @app.post("/alunos/finalizar-treino")
@@ -282,15 +279,49 @@ def contar_notif(email: str = Depends(auth.obter_usuario_atual), db: Session = D
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     return {"contagem": db.query(models.Notificacao).filter(models.Notificacao.destinatario_id == u.id, models.Notificacao.status == "PENDENTE").count()}
 
+# --- main.py ---
+
+# --- main.py ---
+
 @app.put("/notificacoes/{notificacao_id}/responder")
 def responder_notif(notificacao_id: int, dados: schemas.RespostaNotificacao, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     notif = db.query(models.Notificacao).filter(models.Notificacao.id == notificacao_id, models.Notificacao.destinatario_id == u.id).first()
-    if notif and notif.tipo == "SOLICITACAO_SEGUIR":
+    
+    if not notif:
+        print(f"[ERRO] Notificacao {notificacao_id} nao encontrada para o usuario {u.id}")
+        raise HTTPException(status_code=404, detail="Notificação não encontrada")
+
+    print(f"[PROCESSANDO] Tipo: {notif.tipo} | Acao: {dados.acao}")
+
+    if notif.tipo == "SOLICITACAO_SEGUIR":
         reg = db.query(models.Seguidor).filter(models.Seguidor.id == notif.referencia_id).first()
-        if dados.acao == "ACEITAR": reg.status = "ACEITO"; notif.status = "ACEITO"
-        else: db.delete(reg); notif.status = "REJEITADO"
-    db.commit(); return {"status": "ok"}
+        if dados.acao == "ACEITAR": 
+            if reg: reg.status = "ACEITO"
+            notif.status = "ACEITO"
+        else: 
+            if reg: db.delete(reg)
+            notif.status = "REJEITADO"
+    
+    elif notif.tipo == "SOLICITACAO_VINCULO":
+        if dados.acao == "ACEITAR":
+            # REPARO: Busca direta para garantir que o Aluno seja encontrado
+            aluno_perfil = db.query(models.Aluno).filter(models.Aluno.usuario_id == u.id).first()
+            
+            if aluno_perfil:
+                print(f"[VINCULO] Vinculando Aluno {aluno_perfil.id} ao Professor {notif.referencia_id}")
+                aluno_perfil.professor_id = notif.referencia_id
+                notif.status = "ACEITO"
+            else:
+                # Se entrar aqui, o seu app vai mostrar o Alerta de Erro!
+                print(f"[CRITICO] Usuario {u.id} tentou aceitar vinculo mas nao tem perfil na tabela 'alunos'")
+                raise HTTPException(status_code=400, detail="Você não possui um perfil de aluno ativo.")
+        else:
+            notif.status = "REJEITADO"
+
+    db.commit() # Efetiva a gravação no Neon
+    print(f"[SUCESSO] Transacao concluida para Notificacao {notificacao_id}")
+    return {"status": "ok"}
 
 # --- 6. PROFESSOR - GESTÃO E VÍNCULOS ---
 
@@ -305,12 +336,19 @@ def criar_perfil_professor(
     
     if u.tipo_perfil != "TEACHER":
         raise HTTPException(status_code=400, detail="Usuário não é um professor.")
-        
-    if u.perfil_professor: 
+
+    cref_enviado = dados.get("cref")
+
+    # Se o perfil já existe (criado automaticamente no cadastro com cref vazio),
+    # apenas atualiza o CREF com o valor real enviado pelo front-end
+    if u.perfil_professor:
+        if cref_enviado:
+            u.perfil_professor.cref = cref_enviado
+            db.commit()
+            db.refresh(u.perfil_professor)
         return u.perfil_professor
 
     # Pega o cref do dicionário enviado pelo front-end
-    cref_enviado = dados.get("cref")
     
     # Criamos o perfil com o CREF real
     novo_prof = models.Professor(usuario_id=u.id, cref=cref_enviado)
@@ -334,15 +372,33 @@ def listar_meus_alunos(email: str = Depends(auth.obter_usuario_atual), db: Sessi
 @app.get("/professor/descobrir-alunos")
 def descobrir_alunos(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
-    alunos = db.query(models.Aluno).filter((models.Aluno.professor_id == None) | (models.Aluno.professor_id != u.perfil_professor.id)).all()
+    # Só exibe alunos sem nenhum professor vinculado
+    alunos = db.query(models.Aluno).filter(models.Aluno.professor_id == None).all()
     return [{"id": a.id, "nome": a.usuario.nome, "foto_perfil": a.usuario.foto_perfil, "objetivo": a.objetivo} for a in alunos]
 
 @app.put("/professor/vincular-aluno/{aluno_id}")
 def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    # 1. Busca o professor (remetente)
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    
+    # 2. Busca o aluno (destinatário)
     aluno = db.query(models.Aluno).filter(models.Aluno.id == aluno_id).first()
-    aluno.professor_id = u.perfil_professor.id
-    db.commit(); return {"status": "ok"}
+    if not aluno:
+        raise HTTPException(status_code=404, detail="Aluno não encontrado")
+
+    # MUDANÇA: Em vez de setar aluno.professor_id aqui, apenas enviamos a notificação
+    disparar_notificacao(
+        db, 
+        dest_id=aluno.usuario_id, 
+        rem_id=u.id, 
+        titulo="Convite de Professor", 
+        msg=f"O professor {u.nome} deseja vincular você como aluno.", 
+        tipo="SOLICITACAO_VINCULO", # Novo tipo para o handshake
+        ref_id=u.perfil_professor.id # Guardamos o ID do professor para o aceite posterior
+    )
+    
+    db.commit()
+    return {"status": "solicitacao_enviada"}
 
 @app.delete("/professor/desvincular-aluno/{aluno_id}")
 def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):

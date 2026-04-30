@@ -8,6 +8,7 @@ class Usuario(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=True)
     senha = Column(String, nullable=False)
     data_nascimento = Column(Date, nullable=False)
     tipo_perfil = Column(String, nullable=False)

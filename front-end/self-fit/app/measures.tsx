@@ -119,7 +119,7 @@ export default function Measures() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
+        <TouchableOpacity onPress={() => router.replace('/profile')} style={styles.headerLeft}>
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   rowInputs: { flexDirection: 'column', marginTop: 8 },
   colInputRow: { width: '100%', marginBottom: 12 },
   inputLabel: { color: colors.grayLight, marginBottom: 6, fontSize: 13 },
-  numericInput: { backgroundColor: colors.inputBg, color: colors.white, paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, fontSize: 16 },
+  numericInput: { backgroundColor: colors.inputBg, color: '#000', paddingHorizontal: 12, paddingVertical: 12, borderRadius: 8, fontSize: 16 },
   registerButton: { marginTop: 12, backgroundColor: colors.red, paddingVertical: 15, borderRadius: 10, alignItems: 'center' },
   registerText: { color: colors.white, fontWeight: '700', fontSize: 16 },
   metricTabs: { flexDirection: 'row', marginTop: 12, justifyContent: 'space-between' },

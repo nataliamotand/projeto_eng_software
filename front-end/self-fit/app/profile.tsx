@@ -46,6 +46,7 @@ export default function Profile() {
   const [handle, setHandle] = useState('');
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [professorNome, setProfessorNome] = useState<string | null>(null);
+  const [objetivo, setObjetivo] = useState<string | null>(null);
 
   // Stats de aluno
   const [trainingsCount, setTrainingsCount] = useState(0);
@@ -100,6 +101,7 @@ export default function Profile() {
           if (alunoRes?.data?.professor_nome) {
             setProfessorNome(alunoRes.data.professor_nome);
           }
+          setObjetivo(alunoRes.data?.objetivo || null);
         } else {
           const [profRes, alunosRes, fichasRes] = await Promise.all([
             api.get('/professores/me').catch(() => ({ data: {} })),
@@ -108,7 +110,7 @@ export default function Profile() {
           ]);
 
           if (!cancelled) {
-            setCref(profRes.data?.cref ?? null);
+            setCref(profRes.data?.cref || null);
             setStudentsCount(Array.isArray(alunosRes.data) ? alunosRes.data.length : 0);
             setWorksheetsCount(Array.isArray(fichasRes.data) ? fichasRes.data.length : 0);
           }
@@ -165,7 +167,7 @@ export default function Profile() {
 
   const stats = isTeacher
     ? [
-        { value: cref ?? '—', label: 'Certificado' },
+        { value: cref || '—', label: 'Certificado' },
         { value: String(studentsCount), label: 'Alunos' },
         { value: String(worksheetsCount), label: 'Fichas' },
       ]
@@ -210,10 +212,16 @@ export default function Profile() {
               </View>
             )}
 
+            {!isTeacher && (
+              <View style={styles.objetivoTag}>
+                <Text style={styles.objetivoTagText}>{objetivo || 'Sem objetivo definido'}</Text>
+              </View>
+            )}
+
             <View style={styles.statsRow}>
               {stats.map((s, i) => (
                 <View key={i} style={styles.statCol}>
-                  <Text style={[styles.statNumber, isTeacher && i === 0 && styles.statNumberCref]} numberOfLines={1} adjustsFontSizeToFit>
+                  <Text style={styles.statNumber} numberOfLines={1} adjustsFontSizeToFit>
                     {s.value}
                   </Text>
                   <Text style={styles.statLabel}>{s.label}</Text>
@@ -304,8 +312,10 @@ const styles = StyleSheet.create({
   statsWrap:          { marginLeft: 16, flex: 1, flexDirection: 'column', alignItems: 'flex-start' },
   profileName:        { color: colors.white, fontSize: 18, fontWeight: '800', marginBottom: 2 },
   profileHandle:      { color: colors.grayText, fontSize: 13, marginBottom: 4 },
-  coachChip:          { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  coachChip:          { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   coachText:          { fontSize: 10, fontWeight: '700', marginLeft: 5, textTransform: 'uppercase', letterSpacing: 0.5 },
+  objetivoTag:        { backgroundColor: '#111', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, marginBottom: 8, alignSelf: 'flex-start' },
+  objetivoTagText:    { color: colors.red, fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
   statsRow:           { flexDirection: 'row', justifyContent: 'space-between', width: '100%', marginTop: 2 },
   statCol:            { alignItems: 'center', flex: 1 },
   statNumber:         { color: colors.white, fontSize: 18, fontWeight: '700' },
