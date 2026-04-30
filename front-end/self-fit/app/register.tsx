@@ -11,7 +11,7 @@ import {
   Platform,
   Dimensions,
   ScrollView,
-  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -30,7 +30,6 @@ export default function Register(){
   // --- ESTADOS DE DADOS ---
   const [name, setName] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [login, setLogin] = useState<string>('');
   const [dob, setDob] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [visible, setVisible] = useState<boolean>(false);
@@ -40,10 +39,11 @@ export default function Register(){
   // --- ESTADOS DE ERRO ---
   const [nameError, setNameError] = useState<string>('');
   const [emailError, setEmailError] = useState<string>('');
-  const [loginError, setLoginError] = useState<string>('');
   const [passwordError, setPasswordError] = useState<string>('');
   const [crefError, setCrefError] = useState<string>('');
   const [dobError, setDobError] = useState<string>('');
+  const [feedback, setFeedback] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const role = (params as any).role;
@@ -77,7 +77,6 @@ export default function Register(){
     let ok = true;
     if (!name.trim() || name.length < 2) { setNameError('Nome inválido.'); ok = false; } else setNameError('');
     if (validateEmailFormat(email.trim())) { setEmailError('E-mail inválido.'); ok = false; } else setEmailError('');
-    if (!login.trim() || login.length < 3) { setLoginError('Login muito curto.'); ok = false; } else setLoginError('');
     if (!password || password.length < 6) { setPasswordError('Senha mínima de 6 caracteres.'); ok = false; } else setPasswordError('');
     if (isPro && (!cref || cref.trim() === '')) { setCrefError('CREF obrigatório.'); ok = false; } else setCrefError('');
     const dErr = validateDobFormat(dob);
@@ -105,7 +104,9 @@ export default function Register(){
 
   // --- FUNÇÃO DE REGISTRO LINKADA ---
   async function handleRegister() {
+    setFeedback(null);
     if (!validateAll()) return;
+    setSubmitting(true);
     try {
       const [day, month, year] = dob.split('/');
       const dateFormatted = `${year}-${month}-${day}`;
@@ -122,17 +123,27 @@ export default function Register(){
       loginData.append('username', email);
       loginData.append('password', password);
       const loginRes = await api.post('/login', loginData);
-
       await AsyncStorage.setItem('token', loginRes.data.access_token);
 
       // C. Criar Perfil
       if (isPro) await api.post('/professores', { cref });
-      else await api.post('/alunos', { objetivo: "Primeiro acesso App" });
+      else await api.post('/alunos', { objetivo: 'Primeiro acesso App' });
 
-      router.replace('/home');
+      setFeedback({ type: 'success', message: 'Conta criada com sucesso! Redirecionando...' });
+      setTimeout(() => router.replace('/home'), 1500);
     } catch (error: any) {
-      const msg = error.response?.data?.detail || "Erro de conexão.";
-      Alert.alert("Ops!", msg);
+      const detail = error.response?.data?.detail;
+      if (typeof detail === 'string' && detail.toLowerCase().includes('email')) {
+        setFeedback({ type: 'error', message: 'Este e-mail já está cadastrado. Faça login ou use outro e-mail.' });
+      } else if (typeof detail === 'string' && detail.toLowerCase().includes('username')) {
+        setFeedback({ type: 'error', message: 'Este login já está em uso. Escolha outro nome de usuário.' });
+      } else if (!error.response) {
+        setFeedback({ type: 'error', message: 'Sem conexão com o servidor. Verifique sua internet.' });
+      } else {
+        setFeedback({ type: 'error', message: detail || 'Ocorreu um erro. Tente novamente.' });
+      }
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -182,13 +193,6 @@ export default function Register(){
                 </View>
                 {dobError ? <Text style={styles.errorText}>{dobError}</Text> : null}
 
-                {/* LOGIN */}
-                <View style={[styles.inputRow, { marginTop: 12 }, loginError && styles.inputError]}>
-                  <Ionicons name="person" size={20} color="#333" style={styles.leftIcon} />
-                  <TextInput style={styles.input} placeholder="Login" placeholderTextColor="#666" value={login} onChangeText={(t) => {setLogin(t); setLoginError('');}} autoCapitalize="none" />
-                </View>
-                {loginError ? <Text style={styles.errorText}>{loginError}</Text> : null}
-
                 {/* SENHA */}
                 <View style={[styles.inputRow, { marginTop: 12 }, passwordError && styles.inputError]}>
                   <MaterialIcons name="lock-outline" size={20} color="#333" style={styles.leftIcon} />
@@ -218,8 +222,29 @@ export default function Register(){
                 {crefError ? <Text style={styles.errorText}>{crefError}</Text> : null}
               </View>
 
-              <TouchableOpacity style={styles.button} activeOpacity={0.85} onPress={handleRegister}>
-                <Text style={styles.buttonText}>Registrar</Text>
+              {/* Banner de Feedback do Servidor */}
+              {feedback && (
+                <View style={[styles.feedbackBanner, feedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError]}>
+                  <Ionicons
+                    name={feedback.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                    size={18}
+                    color="#fff"
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text style={styles.feedbackText}>{feedback.message}</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[styles.button, submitting && { opacity: 0.7 }]}
+                activeOpacity={0.85}
+                onPress={handleRegister}
+                disabled={submitting}
+              >
+                {submitting
+                  ? <ActivityIndicator color={colors.white} />
+                  : <Text style={styles.buttonText}>Registrar</Text>
+                }
               </TouchableOpacity>
             </View>
           </ScrollView>
@@ -258,4 +283,8 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.white, fontFamily: 'Anton', fontSize: 16 },
   errorText: { color: colors.red, marginTop: 4, alignSelf: 'flex-start', fontSize: 12 },
   scroll: { flex: 1, width: '100%' },
+  feedbackBanner: { flexDirection: 'row', alignItems: 'center', width: '100%', marginTop: 14, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, borderLeftWidth: 4 },
+  feedbackError: { backgroundColor: 'rgba(220,38,38,0.15)', borderLeftColor: '#dc2626' },
+  feedbackSuccess: { backgroundColor: 'rgba(22,163,74,0.15)', borderLeftColor: '#16a34a' },
+  feedbackText: { flex: 1, color: colors.white, fontSize: 13, fontWeight: '600', lineHeight: 18 },
 });

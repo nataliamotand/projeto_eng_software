@@ -12,7 +12,6 @@ import {
 import { Calendar } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import StickyFooter from '../src/components/ui/StickyFooter';
 import { colors } from '../src/components/ui/theme';
 import api from '@/src/services/api';
 
@@ -221,7 +220,6 @@ function MultiYearView({ workoutMap }: { workoutMap: Record<string, any> }) {
 export default function CalendarScreen() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'month' | 'year' | 'multi-year'>('month');
-  const [showModeMenu, setShowModeMenu] = useState(false);
   const [loading, setLoading] = useState(true);
   const [workoutHistory, setWorkoutHistory] = useState<any[]>([]);
 
@@ -258,18 +256,23 @@ export default function CalendarScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
-            <Ionicons name="arrow-back" size={22} color={colors.white} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
+          <Ionicons name="arrow-back" size={22} color={colors.white} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Calendário</Text>
+        <View style={styles.headerRight} />
+      </View>
+      <View style={styles.periodTabs}>
+        {([['month','Mês'],['year','Ano'],['multi-year','Plurianual']] as const).map(([mode, label]) => (
+          <TouchableOpacity
+            key={mode}
+            style={[styles.periodTab, viewMode === mode && styles.periodTabActive]}
+            onPress={() => setViewMode(mode)}
+          >
+            <Text style={[styles.periodTabText, viewMode === mode && styles.periodTabTextActive]}>{label}</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => setShowModeMenu(true)} style={styles.modeButton}>
-            <Text style={styles.modeText}>{viewMode === 'month' ? 'Mês' : viewMode === 'year' ? 'Ano' : 'Plurianual'}</Text>
-            <Ionicons name="chevron-down" size={16} color={colors.white} style={{ marginLeft: 6 }} />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.red} />
-        </View>
+        ))}
+      </View>
       </SafeAreaView>
     );
   }
@@ -277,52 +280,33 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerLeft}>
+        <TouchableOpacity onPress={() => router.replace('/profile')} style={styles.headerLeft}>
           <Ionicons name="arrow-back" size={22} color={colors.white} />
         </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => setShowModeMenu(true)} style={styles.modeButton}>
-          <Text style={styles.modeText}>{viewMode === 'month' ? 'Mês' : viewMode === 'year' ? 'Ano' : 'Plurianual'}</Text>
-          <Ionicons name="chevron-down" size={16} color={colors.white} style={{ marginLeft: 6 }} />
-        </TouchableOpacity>
-
-        {showModeMenu && (
-          <TouchableOpacity style={styles.modeOverlay} activeOpacity={1} onPress={() => setShowModeMenu(false)}>
-            <View style={styles.modeMenu}>
-              <TouchableOpacity style={styles.modeOption} onPress={() => { setViewMode('month'); setShowModeMenu(false); }}>
-                <Text style={styles.modeOptionText}>Mês</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modeOption} onPress={() => { setViewMode('year'); setShowModeMenu(false); }}>
-                <Text style={styles.modeOptionText}>Ano</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modeOption} onPress={() => { setViewMode('multi-year'); setShowModeMenu(false); }}>
-                <Text style={styles.modeOptionText}>Plurianual</Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.headerTitle}>Calendário</Text>
+        <View style={styles.headerRight} />
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 80 }}>
-        {viewMode === 'month' && (
-          <View>
-            <View style={styles.statsTop}>
-              <View style={styles.statBlock}>
-                <FontAwesome name="fire" size={18} color={colors.red} />
-                <Text style={styles.statText}>Sequência de 12 semanas</Text>
-              </View>
-            </View>
+      <View style={styles.periodTabs}>
+        {([['month','Mês'],['year','Ano'],['multi-year','Plurianual']] as const).map(([mode, label]) => (
+          <TouchableOpacity
+            key={mode}
+            style={[styles.periodTab, viewMode === mode && styles.periodTabActive]}
+            onPress={() => setViewMode(mode)}
+          >
+            <Text style={[styles.periodTabText, viewMode === mode && styles.periodTabTextActive]}>{label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-            <MonthView workoutMap={workoutMap} />
-          </View>
-        )}
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 24 }}>
+        {viewMode === 'month' && <MonthView workoutMap={workoutMap} />}
 
         {viewMode === 'year' && <YearView workoutMap={workoutMap} />}
 
         {viewMode === 'multi-year' && <MultiYearView workoutMap={workoutMap} />}
       </ScrollView>
 
-      <StickyFooter active="workouts" />
     </SafeAreaView>
   );
 }
@@ -331,11 +315,15 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingTop: 48, paddingBottom: 12 },
   headerLeft: { width: 40 },
+  headerRight: { width: 40 },
+  headerTitle: { color: colors.white, fontWeight: '700', fontSize: 18 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modeButton: { flexDirection: 'row', alignItems: 'center' },
-  modeText: { color: colors.white, fontWeight: '700', fontSize: 16 },
-  headerRight: { flexDirection: 'row', alignItems: 'center' },
-  iconTouch: { marginLeft: 12 },
+
+  periodTabs: { flexDirection: 'row', marginHorizontal: 12, marginBottom: 12, backgroundColor: '#111', borderRadius: 10, padding: 4 },
+  periodTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
+  periodTabActive: { backgroundColor: colors.red },
+  periodTabText: { color: colors.grayText, fontWeight: '600', fontSize: 13 },
+  periodTabTextActive: { color: colors.white },
 
   container: { flex: 1, paddingHorizontal: 12 },
   statsTop: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#0a0a0a', padding: 12, borderRadius: 10, marginBottom: 12 },
@@ -360,6 +348,10 @@ const styles = StyleSheet.create({
   bottomNav: { backgroundColor: colors.darkGray, height: 64, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
   navItem: { alignItems: 'center', justifyContent: 'center', width: 72, height: 64 },
   activeIndicator: { marginTop: 6, width: 28, height: 3, backgroundColor: colors.red, borderRadius: 2 },
+  modeButton: { flexDirection: 'row', alignItems: 'center' },
+  modeText: { color: colors.white, fontWeight: '700', fontSize: 16 },
+  headerRight: { flexDirection: 'row', alignItems: 'center' },
+  iconTouch: { marginLeft: 12 },
   modeOverlay: { position: 'absolute', left: 0, right: 0, top: 56, bottom: 0, zIndex: 40 },
   modeMenu: { position: 'absolute', alignSelf: 'center', top: 0, backgroundColor: '#0b0b0b', borderRadius: 8, paddingVertical: 8, width: 160, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.4, shadowRadius: 6, elevation: 6 },
   modeOption: { paddingVertical: 10, paddingHorizontal: 12 },
