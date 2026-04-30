@@ -19,16 +19,21 @@ import { useFocusEffect } from '@react-navigation/native';
 import api from '../src/services/api';
 import { colors } from '../src/components/ui/theme';
 import ImageRotator from '../src/components/ImageRotator';
+import { buildNameMap } from '../src/services/exerciseApi';
 
-// Tipagem baseada no seu modelo de dados
+type SetRow = { id: string; weight: string; reps: string; distance: string; time: string; };
+
 interface RoutineExercise {
   id: string | number;
   name: string;
   target: string;
+  category: string;
   notes: string;
-  series: number;
-  weight: string;
-  reps: string;
+  sets: SetRow[];
+}
+
+function makeSet(weight = '', reps = '', idx = 0): SetRow {
+  return { id: `${Date.now()}_${idx}`, weight, reps, distance: '', time: '' };
 }
 
 export default function EditRoutine() {
@@ -46,14 +51,17 @@ export default function EditRoutine() {
 
   // Cache key único por rotina para não conflitar com create_routine
   const cacheKey = `__EDIT_ROUTINE_EXERCISES_${id}`;
+  const titleCacheKey = `__EDIT_ROUTINE_TITLE_${id}`;
 
   // 1. CARREGAR DADOS EXISTENTES (HIDRATAÇÃO)
   useEffect(() => {
     if (!id) return;
     // Se já temos dados em cache (voltando de choose_exercise), usa o cache
     const cached = (globalThis as any)[cacheKey];
+    const cachedTitle = (globalThis as any)[titleCacheKey];
     if (Array.isArray(cached) && cached.length > 0) {
       setSelectedExercises(cached);
+      if (cachedTitle) setRoutineTitle(cachedTitle);
       setLoading(false);
     } else {
       loadRoutineData();
@@ -67,25 +75,41 @@ export default function EditRoutine() {
     }
   }, [selectedExercises, loading]);
 
+  // Persiste o título no cache global
+  useEffect(() => {
+    if (routineTitle) {
+      (globalThis as any)[titleCacheKey] = routineTitle;
+    }
+  }, [routineTitle]);
+
   async function loadRoutineData() {
     try {
       setLoading(true);
-      const response = await api.get(`/fichas/${id}`);
+      // Carrega dados da rotina e mapa de nomes em paralelo
+      const [response, nameMap] = await Promise.all([
+        api.get(`/fichas/${id}`),
+        buildNameMap(),
+      ]);
       const data = response.data;
 
       setRoutineTitle(data.titulo);
       
-      // Mapeia os exercícios do banco para o formato do estado do Front-end
-      // Usa o nome traduzido do JSON local se disponível, senão formata o ID
-      const mappedExercises = data.exercicios.map((ex: any) => ({
-        id: ex.exercicio_referencia_id,
-        name: ex.nome_exercicio || ex.exercicio_referencia_id.replace(/_/g, ' '),
-        target: ex.musculo || '',
-        notes: ex.observacao || '',
-        series: ex.series,
-        weight: String(ex.carga),
-        reps: String(ex.repeticoes)
-      }));
+      // Mapeia os exercícios usando o nome correto do JSON local e expande séries individuais
+      const mappedExercises = data.exercicios.map((ex: any) => {
+        const refId = String(ex.exercicio_referencia_id);
+        const count = Math.max(Number(ex.series) || 1, 1);
+        const sets: SetRow[] = Array.from({ length: count }, (_, i) =>
+          makeSet(String(ex.carga || ''), String(ex.repeticoes || ''), i)
+        );
+        return {
+          id: refId,
+          name: nameMap[refId] || refId,
+          target: '',
+          category: '',
+          notes: ex.observacao || '',
+          sets,
+        };
+      });
 
       setSelectedExercises(mappedExercises);
     } catch (error) {
@@ -106,10 +130,9 @@ export default function EditRoutine() {
           id: p.id,
           name: p.name || p.title || '',
           target: p.target || p.muscle || '',
+          category: p.category || '',
           notes: '',
-          series: 3,
-          weight: "0",
-          reps: "12"
+          sets: [makeSet('', '12')],
         }));
 
         setSelectedExercises(prev => {
@@ -133,9 +156,9 @@ export default function EditRoutine() {
         titulo: routineTitle,
         exercicios: selectedExercises.map(ex => ({
           exercicio_referencia_id: String(ex.id),
-          series: Number(ex.series),
-          repeticoes: String(ex.reps),
-          carga: String(ex.weight),
+          series: ex.sets.length,
+          repeticoes: String(ex.sets[0]?.reps || '0'),
+          carga: String(ex.sets[0]?.weight || '0'),
           observacao: ex.notes
         }))
       };
@@ -144,6 +167,7 @@ export default function EditRoutine() {
 
       // Limpa o cache ao salvar com sucesso
       delete (globalThis as any)[cacheKey];
+      delete (globalThis as any)[titleCacheKey];
 
       Alert.alert("Sucesso", "Rotina atualizada com sucesso!", [
         { text: "OK", onPress: () => router.replace('/routines_and_workouts') }
@@ -159,9 +183,31 @@ export default function EditRoutine() {
     }
   }
 
-  // Funções de manipulação local
-  function updateEx(exId: string | number, field: keyof RoutineExercise, value: any) {
-    setSelectedExercises(prev => prev.map(ex => ex.id === exId ? { ...ex, [field]: value } : ex));
+  function updateSet(exId: string | number, setIdx: number, field: keyof SetRow, value: string) {
+    setSelectedExercises(prev => prev.map(ex => {
+      if (ex.id !== exId) return ex;
+      const sets = ex.sets.map((s, i) => i === setIdx ? { ...s, [field]: value } : s);
+      return { ...ex, sets };
+    }));
+  }
+
+  function addSet(exId: string | number) {
+    setSelectedExercises(prev => prev.map(ex => {
+      if (ex.id !== exId) return ex;
+      const last = ex.sets[ex.sets.length - 1];
+      return { ...ex, sets: [...ex.sets, makeSet(last?.weight || '', last?.reps || '', ex.sets.length)] };
+    }));
+  }
+
+  function removeSet(exId: string | number, setIdx: number) {
+    setSelectedExercises(prev => prev.map(ex => {
+      if (ex.id !== exId || ex.sets.length <= 1) return ex;
+      return { ...ex, sets: ex.sets.filter((_, i) => i !== setIdx) };
+    }));
+  }
+
+  function updateNotes(exId: string | number, value: string) {
+    setSelectedExercises(prev => prev.map(ex => ex.id === exId ? { ...ex, notes: value } : ex));
   }
 
   if (loading) {
@@ -195,6 +241,7 @@ export default function EditRoutine() {
 
         {selectedExercises.map((ex) => (
           <View key={String(ex.id)} style={styles.exerciseCard}>
+            {/* Card Header */}
             <View style={styles.cardHeader}>
               <Text style={styles.exerciseName}>{ex.name}</Text>
               <TouchableOpacity onPress={() => { setMenuTargetId(ex.id); setMenuVisible(true); }}>
@@ -202,42 +249,43 @@ export default function EditRoutine() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputsRow}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Séries</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  value={String(ex.series)}
-                  keyboardType="numeric"
-                  onChangeText={(v) => updateEx(ex.id, 'series', v)}
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Reps</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  value={ex.reps}
-                  keyboardType="numeric"
-                  onChangeText={(v) => updateEx(ex.id, 'reps', v)}
-                />
-              </View>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Peso (kg)</Text>
-                <TextInput
-                  style={styles.smallInput}
-                  value={ex.weight}
-                  keyboardType="numeric"
-                  onChangeText={(v) => updateEx(ex.id, 'weight', v)}
-                />
-              </View>
+            {/* Column Headers */}
+            <View style={styles.setsHeader}>
+              <Text style={styles.setsHeaderIndex}>SÉRIE</Text>
+              <Text style={styles.setsHeaderText}>KG</Text>
+              <Text style={styles.setsHeaderText}>KM</Text>
+              <Text style={styles.setsHeaderText}>REPS</Text>
+              <Text style={styles.setsHeaderText}>TEMPO</Text>
+              <View style={{ width: 28 }} />
             </View>
 
+            {/* Each Set Row */}
+            {ex.sets.map((s, idx) => (
+              <View key={s.id} style={styles.setRow}>
+                <Text style={styles.setIndex}>{idx + 1}</Text>
+                <TextInput style={styles.setInput} value={s.weight} keyboardType="numeric" placeholder="-" placeholderTextColor="#333" onChangeText={v => updateSet(ex.id, idx, 'weight', v)} />
+                <TextInput style={styles.setInput} value={s.distance} keyboardType="numeric" placeholder="-" placeholderTextColor="#333" onChangeText={v => updateSet(ex.id, idx, 'distance', v)} />
+                <TextInput style={styles.setInput} value={s.reps} keyboardType="numeric" placeholder="-" placeholderTextColor="#333" onChangeText={v => updateSet(ex.id, idx, 'reps', v)} />
+                <TextInput style={styles.setInput} value={s.time} keyboardType="numeric" placeholder="-" placeholderTextColor="#333" onChangeText={v => updateSet(ex.id, idx, 'time', v)} />
+                <TouchableOpacity onPress={() => removeSet(ex.id, idx)} style={{ padding: 4 }}>
+                  <Ionicons name="remove-circle-outline" size={20} color="#444" />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {/* Add Series button */}
+            <TouchableOpacity style={styles.addSetBtn} onPress={() => addSet(ex.id)}>
+              <Ionicons name="add-circle-outline" size={18} color={colors.red} />
+              <Text style={styles.addSetText}>Adicionar série</Text>
+            </TouchableOpacity>
+
+            {/* Notes */}
             <TextInput
               style={styles.notesInput}
               value={ex.notes}
               placeholder="Observações..."
               placeholderTextColor="#444"
-              onChangeText={(v) => updateEx(ex.id, 'notes', v)}
+              onChangeText={v => updateNotes(ex.id, v)}
             />
           </View>
         ))}
@@ -282,13 +330,17 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 20 },
   titleInput: { color: '#fff', fontSize: 24, fontWeight: 'bold', marginBottom: 30, borderBottomWidth: 1, borderBottomColor: '#222', paddingBottom: 10 },
   exerciseCard: { backgroundColor: '#111', borderRadius: 15, padding: 15, marginBottom: 15, borderWidth: 1, borderColor: '#222' },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  exerciseName: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  inputsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  inputGroup: { alignItems: 'center' },
-  label: { color: '#666', fontSize: 10, marginBottom: 5, fontWeight: 'bold' },
-  smallInput: { backgroundColor: '#1A1A1A', color: '#fff', width: 60, textAlign: 'center', padding: 10, borderRadius: 8 },
-  notesInput: { color: '#888', marginTop: 15, fontSize: 13, fontStyle: 'italic' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  exerciseName: { color: '#fff', fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
+  setsHeader: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#1A1A1A', marginBottom: 4 },
+  setsHeaderIndex: { color: '#555', fontSize: 10, fontWeight: 'bold', width: 36, textAlign: 'center' },
+  setsHeaderText: { flex: 1, color: '#555', fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
+  setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  setIndex: { color: '#888', width: 36, textAlign: 'center', fontWeight: 'bold' },
+  setInput: { flex: 1, backgroundColor: '#1A1A1A', color: '#fff', borderRadius: 8, textAlign: 'center', paddingVertical: 8, marginHorizontal: 4, fontSize: 15, fontWeight: '600' },
+  addSetBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingVertical: 6, gap: 6 },
+  addSetText: { color: colors.red, fontSize: 13, fontWeight: '600' },
+  notesInput: { color: '#888', marginTop: 10, fontSize: 13, fontStyle: 'italic', borderTopWidth: 1, borderTopColor: '#1A1A1A', paddingTop: 10 },
   addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 20, padding: 15, borderStyle: 'dashed', borderWidth: 1, borderColor: '#333', borderRadius: 10 },
   addButtonText: { color: '#fff', marginLeft: 10 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },

@@ -94,6 +94,7 @@ class ItemExercicioCreate(BaseModel):
 class FichaTreinoCreate(BaseModel):
     titulo: str
     exercicios: List[ItemExercicioCreate]
+    aluno_id: Optional[int] = None  # Obrigatório quando criado por professor
 
 class ItemExercicioResponse(BaseModel):
     id: int

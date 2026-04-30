@@ -1,0 +1,137 @@
+@baseUrl = http://127.0.0.1:8000
+
+# ====================================================================
+#  1. USUÁRIOS E AUTENTICAÇÃO
+# ====================================================================
+
+### Cadastrar novo usuário (Aluno)
+# @name createUser
+POST {{baseUrl}}/usuarios
+Content-Type: application/json
+
+{
+    "nome": "Teste da Silva",
+    "email": "teste@example.com",
+    "senha": "123",
+    "data_nascimento": "1995-10-15",
+    "tipo_perfil": "STUDENT"
+}
+
+### Realizar Login
+# @name login
+POST {{baseUrl}}/login
+Content-Type: application/x-www-form-urlencoded
+
+username=teste@example.com&password=123
+
+### Extrair o Token (Variável preenchida dinamicamente no REST Client do VS Code)
+@token = {{login.response.body.access_token}}
+
+### Ler Perfil (ME)
+GET {{baseUrl}}/usuarios/me
+Authorization: Bearer {{token}}
+
+### Atualizar Perfil
+PUT {{baseUrl}}/usuarios/me
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "nome": "Teste da Silva (Atualizado)",
+    "foto_perfil": "https://i.pravatar.cc/300"
+}
+
+
+# ====================================================================
+#  2. FICHAS E TREINOS
+# ====================================================================
+
+### Criar Nova Ficha de Treino
+POST {{baseUrl}}/fichas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "titulo": "Ficha A - Hipertrofia",
+    "exercicios": [
+        {
+            "exercicio_referencia_id": "1",
+            "series": 3,
+            "repeticoes": "10-12",
+            "carga": "20kg",
+            "observacao": "Focar na descida lenta"
+        }
+    ]
+}
+
+### Listar Minhas Fichas
+GET {{baseUrl}}/alunos/minhas-rotinas
+Authorization: Bearer {{token}}
+
+### Finalizar Treino (Registrar histórico)
+POST {{baseUrl}}/alunos/finalizar-treino
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "titulo": "Ficha A - Hipertrofia",
+    "duracao_minutos": 45,
+    "volume_total": 2400.0,
+    "exercicios": [
+        {
+            "nome": "Supino Reto",
+            "series": 3,
+            "repeticoes": "12",
+            "carga": "20kg"
+        }
+    ]
+}
+
+### Listar Histórico de Treinos
+GET {{baseUrl}}/alunos/historico-treinos
+Authorization: Bearer {{token}}
+
+
+# ====================================================================
+#  3. EVOLUÇÃO E MEDIDAS
+# ====================================================================
+
+### Registrar Evolução Corporal
+POST {{baseUrl}}/alunos/evolucao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+    "peso": 75.5,
+    "porcentagem_gordura": 18.5,
+    "massa_muscular": 35.0
+}
+
+### Obter Histórico de Evolução
+GET {{baseUrl}}/alunos/meu-historico
+Authorization: Bearer {{token}}
+
+
+# ====================================================================
+#  4. SOCIAL E FEED
+# ====================================================================
+
+### Descobrir Novos Usuários
+GET {{baseUrl}}/usuarios/descobrir
+Authorization: Bearer {{token}}
+
+### Seguir Usuário (Substitua o ID)
+POST {{baseUrl}}/usuarios/seguir/2
+Authorization: Bearer {{token}}
+
+### Feed de Amigos (Agregado de Treinos e Evolução)
+GET {{baseUrl}}/aluno/feed-amigos
+Authorization: Bearer {{token}}
+
+### Listar Notificações Pendentes
+GET {{baseUrl}}/notificacoes
+Authorization: Bearer {{token}}
+
+### Contagem de Notificações
+GET {{baseUrl}}/notificacoes/contagem
+Authorization: Bearer {{token}}

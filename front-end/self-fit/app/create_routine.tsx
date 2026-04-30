@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   ScrollView,
+  FlatList,
   Dimensions,
   Modal,
   Pressable,
@@ -17,7 +18,7 @@ import {
 } from 'react-native';
 import ImageRotator from '../src/components/ui/image-rotator';
 import { Ionicons, MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { colors } from '../src/components/ui/theme';
 import api from '../src/services/api'; // Importação da API adicionada
 
@@ -64,18 +65,27 @@ function createEmptySet(): SetRow {
 
 export default function CreateRoutine() {
   const router = useRouter();
+  const { alunoId, studentId } = useLocalSearchParams<{ alunoId?: string, studentId?: string }>();
   const [routineTitle, setRoutineTitle] = useState('');
   const [selectedExercises, setSelectedExercises] = useState<RoutineExercise[]>([]);
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuTargetId, setMenuTargetId] = useState<string | number | null>(null);
   const [publishMenuVisible, setPublishMenuVisible] = useState(false);
-  const [loading, setLoading] = useState(false); // Adicionei o estado de loading caso não tivesse
+  const [loading, setLoading] = useState(false);
 
-  // 1. Hidratação inicial
+  // Calcula o ID do aluno a partir dos parâmetros da rota
+  const paramAlunoId = alunoId || studentId;
+  const [selectedAlunoId, setSelectedAlunoId] = useState<number | null>(paramAlunoId ? Number(paramAlunoId) : null);
+
+  // 1. Hidratação inicial (exercícios + título)
   useEffect(() => {
     const current = (globalThis as any).__CURRENT_ROUTINE_EXERCISES;
+    const savedTitle = (globalThis as any).__CURRENT_ROUTINE_TITLE;
     if (Array.isArray(current) && current.length > 0) {
       setSelectedExercises(current);
+    }
+    if (savedTitle) {
+      setRoutineTitle(savedTitle);
     }
   }, []);
 
@@ -83,6 +93,10 @@ export default function CreateRoutine() {
   useEffect(() => {
     (globalThis as any).__CURRENT_ROUTINE_EXERCISES = selectedExercises;
   }, [selectedExercises]);
+
+  useEffect(() => {
+    (globalThis as any).__CURRENT_ROUTINE_TITLE = routineTitle;
+  }, [routineTitle]);
 
   // 3. Captura de exercícios vindos da busca
   useFocusEffect(
@@ -124,7 +138,8 @@ export default function CreateRoutine() {
           repeticoes: String(ex.sets[0]?.reps || "0"),
           carga: String(ex.sets[0]?.weight || "0"),
           observacao: ex.notes || ""
-        }))
+        })),
+        ...(selectedAlunoId ? { aluno_id: selectedAlunoId } : {}),
       };
 
       console.log("🚀 Enviando rotina:", payload.titulo);
@@ -133,23 +148,31 @@ export default function CreateRoutine() {
       
       // Limpeza de cache após sucesso
       (globalThis as any).__CURRENT_ROUTINE_EXERCISES = [];
+      (globalThis as any).__CURRENT_ROUTINE_TITLE = '';
       setPublishMenuVisible(false);
       
       // Feedback e Navegação
-      Alert.alert("Sucesso", "Treino salvo no seu perfil!", [
+      const isTeacher = !!selectedAlunoId;
+      const successMessage = isTeacher ? "Treino criado para o aluno com sucesso!" : "Treino salvo no seu perfil!";
+      
+      const navigateBack = () => {
+        if (isTeacher) {
+          router.back();
+        } else {
+          router.replace('/routines_and_workouts'); 
+        }
+      };
+
+      Alert.alert("Sucesso", successMessage, [
         { 
           text: "OK", 
-          onPress: () => {
-            // replace remove a tela de 'criar' do histórico, 
-            // evitando que o usuário volte para o formulário ao usar o botão 'voltar' do Android
-            router.replace('/routines_and_workouts'); 
-          } 
+          onPress: navigateBack
         }
       ]);
 
       // Fallback para Web (onde o Alert.alert às vezes não bloqueia o código)
       if (Platform.OS === 'web') {
-        router.replace('/routines_and_workouts');
+        navigateBack();
       }
 
     } catch (error: any) {
@@ -178,10 +201,26 @@ export default function CreateRoutine() {
     );
   }
 
+  function removeSeriesFromExercise(exId: string | number, setIdx: number) {
+    setSelectedExercises((prev) =>
+      prev.map((ex) => {
+        if (ex.id !== exId || ex.sets.length <= 1) return ex;
+        return { ...ex, sets: ex.sets.filter((_, i) => i !== setIdx) };
+      })
+    );
+  }
+
+  function handleCancel() {
+    // Limpa o cache para a próxima criação começar do zero
+    (globalThis as any).__CURRENT_ROUTINE_EXERCISES = [];
+    (globalThis as any).__CURRENT_ROUTINE_TITLE = '';
+    router.back();
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
           <Text style={styles.cancelButtonText}>Cancelar</Text>
         </TouchableOpacity>
 
@@ -226,8 +265,8 @@ export default function CreateRoutine() {
                     <Text style={styles.exName}>{ex.name}</Text>
                     <Text style={styles.exTarget}>{muscleMap[String(ex.target).toLowerCase()] || ex.target}</Text>
                   </View>
-                  <TouchableOpacity onPress={() => openMenuFor(ex.id)}>
-                    <Ionicons name="ellipsis-vertical" size={20} color={colors.grayLight} />
+                  <TouchableOpacity onPress={() => handleDeleteExercise(ex.id)}>
+                    <Ionicons name="trash-outline" size={20} color={colors.red} />
                   </TouchableOpacity>
                 </View>
 
@@ -246,7 +285,10 @@ export default function CreateRoutine() {
                     <View style={styles.setsHeader}>
                       <Text style={styles.setsHeaderIndex}>SÉRIE</Text>
                       <Text style={styles.setsHeaderText}>KG</Text>
+                      <Text style={styles.setsHeaderText}>KM</Text>
                       <Text style={styles.setsHeaderText}>REPS</Text>
+                      <Text style={styles.setsHeaderText}>TEMPO</Text>
+                      <View style={{ width: 30 }} />
                     </View>
 
                     {ex.sets.map((s, idx) => (
@@ -256,6 +298,8 @@ export default function CreateRoutine() {
                           style={styles.setInput}
                           value={s.weight}
                           keyboardType="numeric"
+                          placeholder="-"
+                          placeholderTextColor="#333"
                           onChangeText={(val) => {
                             setSelectedExercises(prev => prev.map(p => {
                               if (p.id === ex.id) {
@@ -268,8 +312,26 @@ export default function CreateRoutine() {
                         />
                         <TextInput
                           style={styles.setInput}
+                          value={s.distance}
+                          keyboardType="numeric"
+                          placeholder="-"
+                          placeholderTextColor="#333"
+                          onChangeText={(val) => {
+                            setSelectedExercises(prev => prev.map(p => {
+                              if (p.id === ex.id) {
+                                const newSets = p.sets.map((ss, si) => si === idx ? { ...ss, distance: val } : ss);
+                                return { ...p, sets: newSets };
+                              }
+                              return p;
+                            }));
+                          }}
+                        />
+                        <TextInput
+                          style={styles.setInput}
                           value={s.reps}
                           keyboardType="numeric"
+                          placeholder="-"
+                          placeholderTextColor="#333"
                           onChangeText={(val) => {
                             setSelectedExercises(prev => prev.map(p => {
                               if (p.id === ex.id) {
@@ -280,6 +342,28 @@ export default function CreateRoutine() {
                             }));
                           }}
                         />
+                        <TextInput
+                          style={styles.setInput}
+                          value={s.time}
+                          keyboardType="numeric"
+                          placeholder="-"
+                          placeholderTextColor="#333"
+                          onChangeText={(val) => {
+                            setSelectedExercises(prev => prev.map(p => {
+                              if (p.id === ex.id) {
+                                const newSets = p.sets.map((ss, si) => si === idx ? { ...ss, time: val } : ss);
+                                return { ...p, sets: newSets };
+                              }
+                              return p;
+                            }));
+                          }}
+                        />
+                        <TouchableOpacity
+                          onPress={() => removeSeriesFromExercise(ex.id, idx)}
+                          style={{ padding: 4 }}
+                        >
+                          <Ionicons name="remove-circle-outline" size={20} color="#444" />
+                        </TouchableOpacity>
                       </View>
                     ))}
                     <TouchableOpacity style={styles.secondaryButton} onPress={() => addSeriesToExercise(ex.id)}>
@@ -321,6 +405,7 @@ export default function CreateRoutine() {
           </View>
         </Pressable>
       </Modal>
+
     </SafeAreaView>
   );
 }

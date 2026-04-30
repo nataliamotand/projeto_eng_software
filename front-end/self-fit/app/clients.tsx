@@ -107,27 +107,6 @@ export default function ClientsScreen() {
         </TouchableOpacity>
       ))}
 
-      <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-        <Text style={styles.sectionTitle}>Meus Modelos de Fichas</Text>
-      </View>
-
-      {fichasModelos.map((ficha) => (
-        <TouchableOpacity key={`ficha-${ficha.id}`} style={styles.fichaCard} onPress={() => router.push(`/edit_routine?fichaId=${ficha.id}`)}>
-          <View style={[styles.iconCircle, { backgroundColor: '#222' }]}>
-            <MaterialCommunityIcons name="file-document-outline" size={20} color={colors.white} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.fichaTitle}>{ficha.titulo}</Text>
-            <Text style={styles.fichaSubtitle}>{ficha.exercicios?.length || 0} exercícios</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.grayText} />
-        </TouchableOpacity>
-      ))}
-      
-      <TouchableOpacity style={styles.addTemplateBtn} onPress={() => router.push('/create_routine')}>
-        <Ionicons name="add" size={20} color={colors.red} />
-        <Text style={styles.addTemplateText}>Criar Nova Ficha Modelo</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 
@@ -143,7 +122,7 @@ export default function ClientsScreen() {
             onPress={() => setTab(t)}
           >
             <Text style={[styles.tabText, tab === t && styles.activeTabText]}>
-              {t === 'my' ? 'Meus Alunos' : t === 'discover' ? 'Descobrir' : 'Fichas'}
+              {t === 'my' ? 'Meus Alunos' : t === 'discover' ? 'Descobrir' : 'Solicitações'}
             </Text>
           </TouchableOpacity>
         ))}
