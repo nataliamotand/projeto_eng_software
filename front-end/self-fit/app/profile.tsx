@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   SafeAreaView,
   View,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { FontAwesome, MaterialIcons, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Header from '../src/components/ui/Header';
 import StickyFooter from '../src/components/ui/StickyFooter';
@@ -58,8 +58,9 @@ export default function Profile() {
   const [cref, setCref] = useState<string | null>(null);
   const [studentsCount, setStudentsCount] = useState(0);
   const [worksheetsCount, setWorksheetsCount] = useState(0);
+  const [especialidade, setEspecialidade] = useState<string | null>(null);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -106,13 +107,14 @@ export default function Profile() {
           const [profRes, alunosRes, fichasRes] = await Promise.all([
             api.get('/professores/me').catch(() => ({ data: {} })),
             api.get('/professor/alunos').catch(() => ({ data: [] })),
-            api.get('/professor/minhas-fichas').catch(() => ({ data: [] })),
+            api.get('/professor/fichas/quantidade').catch(() => ({ data: { quantidade: 0 } })),
           ]);
 
           if (!cancelled) {
             setCref(profRes.data?.cref || null);
             setStudentsCount(Array.isArray(alunosRes.data) ? alunosRes.data.length : 0);
-            setWorksheetsCount(Array.isArray(fichasRes.data) ? fichasRes.data.length : 0);
+            setWorksheetsCount(fichasRes.data?.quantidade || 0);
+            setEspecialidade(profRes.data?.especialidade || null);
           }
         }
       } catch (e) {
@@ -122,7 +124,7 @@ export default function Profile() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, []));
 
   const handleLogout = async () => {
     try {
@@ -215,6 +217,12 @@ export default function Profile() {
             {!isTeacher && (
               <View style={styles.objetivoTag}>
                 <Text style={styles.objetivoTagText}>{objetivo || 'Sem objetivo definido'}</Text>
+              </View>
+            )}
+
+            {isTeacher && (
+              <View style={styles.objetivoTag}>
+                <Text style={styles.objetivoTagText}>{especialidade || 'Sem especialidade'}</Text>
               </View>
             )}
 

@@ -34,6 +34,8 @@ with engine.begin() as conn:
             END IF;
         END $$;
     """))
+    # Suporte a mensagem personalizada na solicitação de ficha
+    conn.execute(text("ALTER TABLE notificacoes ADD COLUMN IF NOT EXISTS mensagem_extra TEXT"))
 
 app = FastAPI(title="API Self-Fit - Sistema Total Integrado")
 
@@ -153,6 +155,18 @@ def criar_ficha(ficha_dados: schemas.FichaTreinoCreate, email: str = Depends(aut
     db.add(nova_ficha); db.flush()
     for ex in ficha_dados.exercicios:
         db.add(models.ItemExercicio(ficha_id=nova_ficha.id, **ex.dict()))
+
+    # Se o professor criou a ficha, resolve as solicitações pendentes do aluno
+    if u.tipo_perfil == "TEACHER":
+        pendentes = db.query(models.Notificacao).filter(
+            models.Notificacao.destinatario_id == u.id,
+            models.Notificacao.tipo == "SOLICITACAO_FICHA",
+            models.Notificacao.referencia_id == aluno_id,
+            models.Notificacao.status == "PENDENTE"
+        ).all()
+        for n in pendentes:
+            n.status = "ACEITO"
+
     db.commit(); db.refresh(nova_ficha); return nova_ficha
 
 @app.delete("/fichas/{ficha_id}")
@@ -422,7 +436,21 @@ def descobrir_alunos(email: str = Depends(auth.obter_usuario_atual), db: Session
     u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
     # Só exibe alunos sem nenhum professor vinculado
     alunos = db.query(models.Aluno).filter(models.Aluno.professor_id == None).all()
-    return [{"id": a.id, "nome": a.usuario.nome, "foto_perfil": a.usuario.foto_perfil, "objetivo": a.objetivo} for a in alunos]
+    
+    notificacoes_pendentes = db.query(models.Notificacao.destinatario_id).filter(
+        models.Notificacao.remetente_id == u.id,
+        models.Notificacao.tipo == "SOLICITACAO_VINCULO",
+        models.Notificacao.status == "PENDENTE"
+    ).all()
+    destinatarios_pendentes = {n[0] for n in notificacoes_pendentes}
+
+    return [{
+        "id": a.id, 
+        "nome": a.usuario.nome, 
+        "foto_perfil": a.usuario.foto_perfil, 
+        "objetivo": a.objetivo,
+        "convite_enviado": a.usuario.id in destinatarios_pendentes
+    } for a in alunos]
 
 @app.put("/professor/vincular-aluno/{aluno_id}")
 def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
@@ -447,6 +475,77 @@ def vincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual)
     
     db.commit()
     return {"status": "solicitacao_enviada"}
+
+@app.post("/aluno/solicitar-ficha")
+def solicitar_ficha_ao_professor(dados: dict, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    """Aluno envia uma solicitação de ficha para o professor vinculado."""
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_aluno:
+        raise HTTPException(status_code=400, detail="Perfil de aluno não encontrado.")
+    
+    aluno = u.perfil_aluno
+    if not aluno.professor_id:
+        raise HTTPException(status_code=400, detail="Você não possui um professor vinculado. Vincule-se a um professor primeiro.")
+    
+    professor = db.query(models.Professor).filter(models.Professor.id == aluno.professor_id).first()
+    if not professor:
+        raise HTTPException(status_code=404, detail="Professor não encontrado.")
+    
+    mensagem = dados.get("mensagem", "").strip()
+    if not mensagem:
+        raise HTTPException(status_code=400, detail="A mensagem não pode ser vazia.")
+
+    disparar_notificacao(
+        db,
+        dest_id=professor.usuario_id,
+        rem_id=u.id,
+        titulo="Solicitação de Ficha",
+        msg=f"{u.nome} está solicitando uma nova rotina: \"{mensagem}\"",
+        tipo="SOLICITACAO_FICHA",
+        ref_id=aluno.id
+    )
+    db.commit()
+    return {"status": "solicitacao_enviada"}
+
+@app.get("/professor/fichas/solicitacoes")
+def listar_solicitacoes_ficha(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    """Lista as solicitações de ficha pendentes dos alunos para o professor logado."""
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_professor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
+    
+    notifs = db.query(models.Notificacao).filter(
+        models.Notificacao.destinatario_id == u.id,
+        models.Notificacao.tipo == "SOLICITACAO_FICHA",
+        models.Notificacao.status == "PENDENTE"
+    ).order_by(models.Notificacao.data_criacao.desc()).all()
+    
+    result = []
+    for n in notifs:
+        aluno = db.query(models.Aluno).filter(models.Aluno.id == n.referencia_id).first()
+        remetente = db.query(models.Usuario).filter(models.Usuario.id == n.remetente_id).first()
+        result.append({
+            "id": n.id,
+            "aluno_id": n.referencia_id,
+            "aluno_nome": remetente.nome if remetente else "Aluno",
+            "mensagem": n.mensagem,
+            "data_criacao": n.data_criacao
+        })
+    return result
+
+@app.get("/professor/fichas/quantidade")
+def quantidade_fichas_professor(email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):
+    """Retorna o número total de fichas criadas por este professor para todos os seus alunos."""
+    u = db.query(models.Usuario).filter(models.Usuario.email == email).first()
+    if not u or not u.perfil_professor:
+        return {"quantidade": 0}
+        
+    quantidade = db.query(models.FichaTreino).join(models.Aluno).filter(
+        models.Aluno.professor_id == u.perfil_professor.id,
+        models.FichaTreino.criado_por_professor == True
+    ).count()
+    
+    return {"quantidade": quantidade}
 
 @app.delete("/professor/desvincular-aluno/{aluno_id}")
 def desvincular_aluno(aluno_id: int, email: str = Depends(auth.obter_usuario_atual), db: Session = Depends(get_db)):

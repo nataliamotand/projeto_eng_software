@@ -86,16 +86,19 @@ export default function RoutinesAndWorkouts() {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestMessage, setRequestMessage] = useState("");
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
+  const [alunoProfile, setAlunoProfile] = useState<any>(null);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [userRes, routinesRes] = await Promise.all([
+      const [userRes, routinesRes, alunoRes] = await Promise.all([
         api.get("/usuarios/me"),
         api.get("/alunos/minhas-rotinas"),
+        api.get("/alunos/me").catch(() => ({ data: null })),
       ]);
       setUser(userRes.data);
       setRoutines(routinesRes.data);
+      setAlunoProfile(alunoRes.data);
     } catch (err) {
       console.error("Erro ao sincronizar dados:", err);
     } finally {
@@ -166,9 +169,23 @@ export default function RoutinesAndWorkouts() {
     if (!requestMessage.trim()) {
       return Alert.alert("Campo Vazio", "Descreva o que você deseja treinar.");
     }
-    setRequestMessage("");
-    setShowRequestModal(false);
-    Alert.alert("Sucesso", "Seu professor foi notificado!");
+
+    if (!alunoProfile?.professor_id) {
+      return Alert.alert(
+        "Sem professor vinculado",
+        "Você precisa estar vinculado a um professor para enviar uma solicitação. Peça para um professor te adicionar na aba 'Descobrir'."
+      );
+    }
+
+    try {
+      await api.post("/aluno/solicitar-ficha", { mensagem: requestMessage });
+      setRequestMessage("");
+      setShowRequestModal(false);
+      Alert.alert("Solicitação enviada!", "Seu professor foi notificado.");
+    } catch (error: any) {
+      const msg = error.response?.data?.detail || "Erro ao enviar solicitação.";
+      Alert.alert("Erro", msg);
+    }
   };
 
   if (loading)
@@ -290,7 +307,7 @@ export default function RoutinesAndWorkouts() {
               {/* Trocamos View por Pressable mantendo o estilo original e adicionando um onPress vazio */}
               <Pressable
                 style={styles.modalContentCentered}
-                onPress={() => {}} // Bloqueia a propagação do clique para o fundo
+                onPress={() => { }} // Bloqueia a propagação do clique para o fundo
               >
                 <Text style={styles.modalAlertText}>Opções da Rotina</Text>
 
@@ -327,7 +344,7 @@ export default function RoutinesAndWorkouts() {
               {/* Trocamos View por Pressable mantendo o estilo original e adicionando um onPress vazio */}
               <Pressable
                 style={styles.modalContentCentered}
-                onPress={() => {}} // Bloqueia a propagação do clique para o fundo
+                onPress={() => { }} // Bloqueia a propagação do clique para o fundo
               >
                 <Text style={styles.modalTitle}>Solicitar ao professor</Text>
                 <TextInput

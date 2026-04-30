@@ -1,4 +1,5 @@
 import 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Slot, useRouter, useSegments } from 'expo-router'; 
 import { StatusBar } from 'expo-status-bar';
@@ -71,16 +72,18 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={CustomDarkTheme}>
-      <View style={{ flex: 1, backgroundColor: '#000' }}> 
-        <Animated.View 
-          entering={FadeInDown.duration(200)} 
-          style={{ flex: 1 }}
-        >
-          <Slot />
-        </Animated.View>
-      </View>
-      <StatusBar style="light" />
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={CustomDarkTheme}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}> 
+          <Animated.View 
+            entering={FadeInDown.duration(200)} 
+            style={{ flex: 1 }}
+          >
+            <Slot />
+          </Animated.View>
+        </View>
+        <StatusBar style="light" />
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

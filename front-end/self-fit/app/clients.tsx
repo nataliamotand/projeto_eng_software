@@ -20,7 +20,7 @@ export default function ClientsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   
   const [students, setStudents] = useState<any[]>([]);
-  const [fichasModelos, setFichasModelos] = useState<any[]>([]);
+
   const [solicitacoes, setSolicitacoes] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
@@ -33,11 +33,7 @@ export default function ClientsScreen() {
         const res = await api.get('/professor/descobrir-alunos');
         setStudents(res.data);
       } else {
-        const [resModelos, resReqs] = await Promise.all([
-          api.get('/professor/fichas/modelos'),
-          api.get('/professor/fichas/solicitacoes')
-        ]);
-        setFichasModelos(resModelos.data);
+        const resReqs = await api.get('/professor/fichas/solicitacoes');
         setSolicitacoes(resReqs.data);
       }
     } catch (error) {
@@ -69,15 +65,21 @@ export default function ClientsScreen() {
         <Text style={styles.studentObjective}>{item.objetivo || 'Sem objetivo definido'}</Text>
       </View>
       {tab === 'discover' ? (
-        <TouchableOpacity 
-          style={styles.addButton}
-          onPress={async () => {
-            await api.put(`/professor/vincular-aluno/${item.id}`);
-            loadData();
-          }}
-        >
-          <Ionicons name="person-add" size={20} color={colors.white} />
-        </TouchableOpacity>
+        item.convite_enviado ? (
+          <View style={styles.sentBadge}>
+            <Text style={styles.sentBadgeText}>Convite enviado</Text>
+          </View>
+        ) : (
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={async () => {
+              await api.put(`/professor/vincular-aluno/${item.id}`);
+              loadData();
+            }}
+          >
+            <Ionicons name="person-add" size={20} color={colors.white} />
+          </TouchableOpacity>
+        )
       ) : (
         <Ionicons name="chevron-forward" size={20} color="#444" />
       )}
@@ -100,8 +102,8 @@ export default function ClientsScreen() {
         <TouchableOpacity key={`sol-${item.id}`} style={styles.fichaCard} onPress={() => router.push(`/create_routine?studentId=${item.aluno_id}`)}>
           <View style={styles.iconCircle}><MaterialCommunityIcons name="bell-alert" size={20} color={colors.red} /></View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.fichaTitle}>Solicitação de Ficha</Text>
-            <Text style={styles.fichaSubtitle}>Aluno aguardando prescrição</Text>
+            <Text style={styles.fichaTitle}>{item.aluno_nome || 'Aluno'}</Text>
+            <Text style={styles.fichaSubtitle} numberOfLines={2}>{item.mensagem || 'Aguardando prescrição'}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.grayText} />
         </TouchableOpacity>
@@ -166,6 +168,8 @@ const styles = StyleSheet.create({
   studentName: { color: colors.white, fontWeight: 'bold', fontSize: 16 },
   studentObjective: { color: colors.grayText, fontSize: 12, marginTop: 4 },
   addButton: { backgroundColor: colors.red, padding: 8, borderRadius: 8 },
+  sentBadge: { backgroundColor: '#333', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8 },
+  sentBadgeText: { color: colors.grayText, fontSize: 12, fontWeight: 'bold' },
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15, gap: 10 },
   sectionTitle: { color: colors.white, fontSize: 14, fontWeight: 'bold', opacity: 0.6 },
