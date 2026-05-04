@@ -52,8 +52,8 @@ type RoutineExercise = {
   id: string | number;
   name: string;
   image?: string;
-  images?: string[]; 
-  target?: string; 
+  images?: string[];
+  target?: string;
   notes?: string;
   restEnabled?: boolean;
   sets: SetRow[];
@@ -133,7 +133,7 @@ export default function CreateRoutine() {
       const payload = {
         titulo: routineTitle,
         exercicios: selectedExercises.map(ex => ({
-          exercicio_referencia_id: String(ex.id), 
+          exercicio_referencia_id: String(ex.id),
           series: ex.sets.length,
           repeticoes: String(ex.sets[0]?.reps || "0"),
           carga: String(ex.sets[0]?.weight || "0"),
@@ -145,27 +145,27 @@ export default function CreateRoutine() {
       console.log("🚀 Enviando rotina:", payload.titulo);
 
       await api.post('/fichas', payload);
-      
+
       // Limpeza de cache após sucesso
       (globalThis as any).__CURRENT_ROUTINE_EXERCISES = [];
       (globalThis as any).__CURRENT_ROUTINE_TITLE = '';
       setPublishMenuVisible(false);
-      
+
       // Feedback e Navegação
       const isTeacher = !!selectedAlunoId;
       const successMessage = isTeacher ? "Treino criado para o aluno com sucesso!" : "Treino salvo no seu perfil!";
-      
+
       const navigateBack = () => {
         if (isTeacher) {
           router.back();
         } else {
-          router.replace('/routines_and_workouts'); 
+          router.replace('/routines_and_workouts');
         }
       };
 
       Alert.alert("Sucesso", successMessage, [
-        { 
-          text: "OK", 
+        {
+          text: "OK",
           onPress: navigateBack
         }
       ]);
@@ -226,8 +226,8 @@ export default function CreateRoutine() {
 
         <Text style={styles.headerTitle}>Criar Rotina</Text>
 
-        <TouchableOpacity 
-          style={[styles.updateButton, (!routineTitle || selectedExercises.length === 0) && { opacity: 0.45 }]} 
+        <TouchableOpacity
+          style={[styles.updateButton, (!routineTitle || selectedExercises.length === 0) && { opacity: 0.45 }]}
           onPress={() => setPublishMenuVisible(true)}
           disabled={!routineTitle || selectedExercises.length === 0 || loading}
         >
@@ -412,7 +412,7 @@ export default function CreateRoutine() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
-  header: { 
+  header: {
     paddingHorizontal: 16, paddingTop: 50, paddingBottom: 15,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: colors.background
@@ -424,16 +424,16 @@ const styles = StyleSheet.create({
   updateText: { color: colors.white, fontWeight: '700' },
   contentContainer: { padding: 16, paddingBottom: 100 },
   section: { marginBottom: 20 },
-  titleInput: { 
-    color: colors.white, fontSize: 22, fontWeight: 'bold', 
-    borderBottomWidth: 1, borderBottomColor: '#222', paddingVertical: 10 
+  titleInput: {
+    color: colors.white, fontSize: 22, fontWeight: 'bold',
+    borderBottomWidth: 1, borderBottomColor: '#222', paddingVertical: 10
   },
   emptyState: { alignItems: 'center', marginTop: 80 },
   emptyText: { color: colors.grayLight, marginBottom: 20, textAlign: 'center', width: '80%' },
-  primaryButton: { 
-    backgroundColor: colors.red, flexDirection: 'row', 
-    alignItems: 'center', justifyContent: 'center', 
-    paddingVertical: 15, borderRadius: 12, width: '90%' 
+  primaryButton: {
+    backgroundColor: colors.red, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 15, borderRadius: 12, width: '90%'
   },
   primaryButtonText: { color: colors.white, fontWeight: '700', fontSize: 16 },
   listWrap: { marginTop: 10 },
@@ -444,25 +444,25 @@ const styles = StyleSheet.create({
   exName: { color: colors.white, fontWeight: '700', fontSize: 16 },
   exTarget: { color: '#9A9A9A', fontSize: 12, marginTop: 4 },
   cardBody: { marginTop: 5 },
-  notesInput: { 
-    color: colors.white, backgroundColor: '#111', borderRadius: 8, 
-    padding: 12, marginBottom: 15, fontSize: 14, textAlignVertical: 'top' 
+  notesInput: {
+    color: colors.white, backgroundColor: '#111', borderRadius: 8,
+    padding: 12, marginBottom: 15, fontSize: 14, textAlignVertical: 'top'
   },
   setsTable: { marginTop: 5 },
   setsHeader: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#222', paddingBottom: 8 },
-  setsHeaderIndex: { color: colors.grayLight, width: 40, fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
-  setsHeaderText: { color: colors.grayLight, flex: 1, textAlign: 'center', fontSize: 11, fontWeight: 'bold' },
-  setRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
-  setIndex: { color: colors.white, width: 40, fontWeight: 'bold', textAlign: 'center' },
-  setInput: { 
-    color: colors.white, flex: 1, textAlign: 'center', 
-    backgroundColor: '#1A1A1A', marginHorizontal: 5, borderRadius: 6, height: 38 
+  setsHeaderIndex: { color: colors.grayLight, width: 30, fontSize: 9, fontWeight: 'bold', textAlign: 'center' },
+  setsHeaderText: { color: colors.grayLight, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 9, fontWeight: 'bold' },
+  setRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
+  setIndex: { color: colors.white, width: 30, fontSize: 12, fontWeight: 'bold', textAlign: 'center' },
+  setInput: {
+    color: colors.white, flex: 1, minWidth: 0, textAlign: 'center', fontSize: 12,
+    backgroundColor: '#1A1A1A', marginHorizontal: 2, borderRadius: 6, height: 36, padding: 0
   },
   secondaryButton: { marginTop: 10, alignItems: 'center', padding: 10 },
   secondaryButtonText: { color: colors.white, fontWeight: 'bold', fontSize: 13, opacity: 0.8 },
-  addMoreButton: { 
-    padding: 20, alignItems: 'center', borderWidth: 1, 
-    borderColor: '#222', borderStyle: 'dashed', borderRadius: 12, marginTop: 10 
+  addMoreButton: {
+    padding: 20, alignItems: 'center', borderWidth: 1,
+    borderColor: '#222', borderStyle: 'dashed', borderRadius: 12, marginTop: 10
   },
   addMoreText: { color: colors.grayMid, fontWeight: '600' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },

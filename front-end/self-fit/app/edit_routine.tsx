@@ -44,7 +44,7 @@ export default function EditRoutine() {
   const [selectedExercises, setSelectedExercises] = useState<RoutineExercise[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   // Controle de menus
   const [menuVisible, setMenuVisible] = useState(false);
   const [menuTargetId, setMenuTargetId] = useState<string | number | null>(null);
@@ -93,7 +93,7 @@ export default function EditRoutine() {
       const data = response.data;
 
       setRoutineTitle(data.titulo);
-      
+
       // Mapeia os exercícios usando o nome correto do JSON local e expande séries individuais
       const mappedExercises = data.exercicios.map((ex: any) => {
         const refId = String(ex.exercicio_referencia_id);
@@ -149,7 +149,7 @@ export default function EditRoutine() {
   // 3. SALVAR ALTERAÇÕES (PUT)
   async function handleUpdate() {
     if (!routineTitle) return Alert.alert("Ops", "Dê um título para a sua rotina.");
-    
+
     try {
       setSaving(true);
       const payload = {
@@ -290,8 +290,8 @@ export default function EditRoutine() {
           </View>
         ))}
 
-        <TouchableOpacity 
-          style={styles.addButton} 
+        <TouchableOpacity
+          style={styles.addButton}
           onPress={() => router.push('/choose_exercise')}
         >
           <Ionicons name="add" size={24} color="#fff" />
@@ -303,15 +303,15 @@ export default function EditRoutine() {
       <Modal visible={menuVisible} transparent animationType="fade">
         <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
           <View style={styles.modalContent}>
-            <Text style={{color: '#fff', marginBottom: 20}}>Remover este exercício da rotina?</Text>
-            <TouchableOpacity 
+            <Text style={{ color: '#fff', marginBottom: 20 }}>Remover este exercício da rotina?</Text>
+            <TouchableOpacity
               style={styles.btnDelete}
               onPress={() => {
                 setSelectedExercises(prev => prev.filter(e => e.id !== menuTargetId));
                 setMenuVisible(false);
               }}
             >
-              <Text style={{color: '#fff', fontWeight: 'bold'}}>Remover</Text>
+              <Text style={{ color: '#fff', fontWeight: 'bold' }}>Remover</Text>
             </TouchableOpacity>
           </View>
         </Pressable>
@@ -333,11 +333,11 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   exerciseName: { color: '#fff', fontSize: 15, fontWeight: 'bold', flex: 1, marginRight: 8 },
   setsHeader: { flexDirection: 'row', alignItems: 'center', paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#1A1A1A', marginBottom: 4 },
-  setsHeaderIndex: { color: '#555', fontSize: 10, fontWeight: 'bold', width: 36, textAlign: 'center' },
-  setsHeaderText: { flex: 1, color: '#555', fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
-  setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
-  setIndex: { color: '#888', width: 36, textAlign: 'center', fontWeight: 'bold' },
-  setInput: { flex: 1, backgroundColor: '#1A1A1A', color: '#fff', borderRadius: 8, textAlign: 'center', paddingVertical: 8, marginHorizontal: 4, fontSize: 15, fontWeight: '600' },
+  setsHeaderIndex: { color: '#555', fontSize: 9, fontWeight: 'bold', width: 30, textAlign: 'center' },
+  setsHeaderText: { flex: 1, minWidth: 0, color: '#555', fontSize: 9, fontWeight: 'bold', textAlign: 'center' },
+  setRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
+  setIndex: { color: '#888', width: 30, fontSize: 12, textAlign: 'center', fontWeight: 'bold' },
+  setInput: { flex: 1, minWidth: 0, backgroundColor: '#1A1A1A', color: '#fff', borderRadius: 6, textAlign: 'center', paddingVertical: 6, marginHorizontal: 2, fontSize: 13, fontWeight: '600', padding: 0 },
   addSetBtn: { flexDirection: 'row', alignItems: 'center', marginTop: 10, paddingVertical: 6, gap: 6 },
   addSetText: { color: colors.red, fontSize: 13, fontWeight: '600' },
   notesInput: { color: '#888', marginTop: 10, fontSize: 13, fontStyle: 'italic', borderTopWidth: 1, borderTopColor: '#1A1A1A', paddingTop: 10 },
